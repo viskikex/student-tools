@@ -1,0 +1,140 @@
+# kortext — textbook importer + summarizer
+
+Extracts chapter content from a [Kortext](https://kortext.com)-hosted eBook into a clean local markdown corpus, then (with [Claude Code](https://claude.com/claude-code)) generates chapter-level study notes.
+
+It works because Kortext serves its eBooks as structured XHTML through a normal web API — so instead of screen-scraping page images, this tool just downloads the chapter text directly and converts it to tidy markdown. One book is about 17 small requests.
+
+> **Heads up:** this only works on books you already have access to through your own Kortext account, and it's for personal study only. See [Legal / Terms of Service](#legal--terms-of-service) at the bottom before you use it.
+
+---
+
+## What you get
+
+For each book, a folder under `corpus/<slug>/` containing:
+
+- `NN-<chapter-title>.md` — one clean markdown file per chapter, with section numbering, citations, and emphasis preserved
+- `NN-<chapter-title>.notes.md` — study notes (created on demand by the summarizer)
+- `_index.md` — a clickable table of contents
+- `_meta.json` — the book's parsed metadata
+- `raw/` — the original downloaded files (kept as a source of truth so markdown can always be regenerated)
+
+It all opens cleanly in [Obsidian](https://obsidian.md).
+
+---
+
+## Setup (one time)
+
+You need **Python 3.11+**. Check with `python3 --version`.
+
+From inside this `kortext/` folder:
+
+```bash
+# 1. Create a virtual environment (an isolated place for this tool's dependencies)
+python3 -m venv .venv
+
+# 2. Install the tool's dependencies into it
+.venv/bin/pip install -e .
+
+# 3. Install the headless browser Playwright uses for login
+.venv/bin/playwright install chromium
+```
+
+That's it. You won't need to repeat this unless you move the folder.
+
+---
+
+## Using it — step by step
+
+There are three steps to import a book, plus an optional one to find a book's ID. All commands are run from inside this `kortext/` folder.
+
+### Step 1 — Log in (one time, or whenever your login expires)
+
+```bash
+.venv/bin/python .claude/skills/kortext-import/scripts/auth.py
+```
+
+This opens a real browser window. Log into Kortext like you normally would, then come back to the terminal and press **Enter**. Your login is saved to `auth-state.json` so the next steps can run on their own.
+
+> If a later step fails with an "unauthorized" or "401" error, your saved login has expired — just run this step again.
+
+### Step 2 (optional) — Find the book's ID
+
+```bash
+.venv/bin/python .claude/skills/kortext-import/scripts/discover.py
+```
+
+This lists the books in your Kortext library with their IDs. You can also get a book's ID straight from its reader URL — it's the number in the address bar when you have the book open.
+
+You'll also pick a **slug** — a short, hyphenated name for the folder this book gets saved in (for example `intro-psych` or `social-work-200`).
+
+### Step 3 — Download the book
+
+```bash
+.venv/bin/python .claude/skills/kortext-import/scripts/scrape.py \
+    --book-id <BOOK_ID> --slug <slug>
+```
+
+Downloads every chapter into `corpus/<slug>/raw/`. Safe to re-run — it skips anything already downloaded, so if your connection drops partway, just run it again.
+
+### Step 4 — Build the markdown
+
+```bash
+.venv/bin/python .claude/skills/kortext-import/scripts/build_markdown.py \
+    --slug <slug>
+```
+
+Turns the downloaded files into clean, readable markdown chapters in `corpus/<slug>/`. Open `corpus/<slug>/_index.md` in Obsidian to browse the result.
+
+---
+
+## Making study notes
+
+This part needs [Claude Code](https://claude.com/claude-code). Open this folder in Claude Code and ask in plain language, e.g.:
+
+> summarize chapter 3
+
+Claude reads the chapter and writes a `NN-...notes.md` file next to it with core ideas, key terms, cross-chapter connections, and self-test questions. Notes cite **section numbers** (like `§2.2`) rather than page numbers, because the source carries stable section numbering instead of print pages.
+
+The two skills that power this live in `.claude/skills/` and load automatically when you open the folder in Claude Code:
+
+- **kortext-import** — runs the import pipeline above from natural-language requests ("import my textbook")
+- **textbook-summarize** — writes the chapter notes ("summarize chapter 3")
+
+---
+
+## Troubleshooting
+
+| Problem | What it means | Fix |
+|---------|---------------|-----|
+| `unauthorized` / `401` error during scrape | Your saved login expired | Re-run Step 1 (`auth.py`) |
+| `No module named 'playwright'` | Dependencies aren't installed | Re-run the Setup steps inside this folder |
+| A chapter's markdown comes out mostly empty | That chapter's source had an unusual structure | Open the matching file in `corpus/<slug>/raw/` to inspect; the renderer lives in `src/kortext/render.py` |
+| Login window never appears | Playwright's browser isn't installed | Run `.venv/bin/playwright install chromium` |
+
+If Kortext changes their website and the tool stops working, the diagnostic scripts in [`recon/`](recon/) exist to help figure out what changed. See `recon/README.md`.
+
+---
+
+## Project layout
+
+```
+kortext/
+├── src/kortext/
+│   ├── api.py            # Kortext API client (login + content fetching)
+│   └── render.py         # XHTML → markdown renderer
+├── .claude/skills/
+│   ├── kortext-import/   # the import pipeline (with scripts/)
+│   └── textbook-summarize/
+├── recon/                # diagnostic scripts (only needed if the API changes)
+├── corpus/               # your imported books land here (not committed to git)
+├── CLAUDE.md             # architecture notes for Claude Code / contributors
+└── pyproject.toml
+```
+
+---
+
+## Legal / Terms of Service
+
+Kortext's terms of service generally prohibit scraping. This tool only requests content through the same path Kortext's own web reader uses, and only for books your account already has legitimate access to. It is intended for **personal study use only** — do not redistribute extracted content.
+
+Using this tool is your responsibility. Respect Kortext's terms and applicable copyright law. If you're not comfortable with that, don't use it.

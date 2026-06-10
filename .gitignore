@@ -1,0 +1,27 @@
+# Virtual environments
+**/.venv/
+**/venv/
+.env
+
+# Python
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Kortext auth — session cookies, treat as a credential. NEVER commit.
+**/auth-state.json
+
+# Scraped textbook content — likely copyrighted, personal use only. NEVER commit.
+kortext/corpus/*
+!kortext/corpus/.gitkeep
+
+# Recon diagnostic output (may contain live tokens before redaction)
+**/probe_out/
+
+# Converted slide output (default local dir)
+slides-output/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
