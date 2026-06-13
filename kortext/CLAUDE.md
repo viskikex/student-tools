@@ -26,7 +26,7 @@ Files:
 - `.claude/skills/kortext-import/scripts/discover.py` — list the user's library
 - `.claude/skills/kortext-import/scripts/scrape.py` — fetch manifest + chapter XHTMLs into `corpus/<slug>/raw/`
 - `.claude/skills/kortext-import/scripts/build_markdown.py` — `raw/*.xhtml` → `corpus/<slug>/NN-*.md`
-- `recon/` — diagnostic scripts to re-run if Kortext changes their API (`sniff_network.py` logs every reader request; `check_token.py` validates the JWT path + a chapter fetch). `network_log.txt` is a sample capture (with secrets redacted) that shows the architecture.
+- `recon/` — diagnostic scripts to re-run if Kortext changes their API (`sniff_network.py` logs every reader request to a fresh `network_log.txt`; `check_token.py` validates the JWT path + a chapter fetch). Generated logs contain live tokens and are gitignored — regenerate one when needed rather than keeping a sample around.
 
 `corpus/<slug>/` layout:
 ```

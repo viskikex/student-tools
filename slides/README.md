@@ -8,45 +8,73 @@ The chapter number is auto-detected from the filename (it understands `ch3`, `ch
 
 ## Setup (one time)
 
-You need **Python 3.11+**. Check with `python3 --version`.
+You need **Python 3.11 or newer**.
 
-From inside this `slides/` folder:
+**First, open a terminal:**
+- **Mac:** press `Cmd+Space`, type "Terminal", hit Enter.
+- **Windows:** press the Windows key, type "PowerShell", hit Enter.
+- **Linux:** you know where it is.
+
+**Check your Python:**
 
 ```bash
-# Create an isolated environment and install the one dependency
+python3 --version        # Mac / Linux
+py --version             # Windows
+```
+
+If that prints 3.11 or newer, you're set. If not:
+- **Mac:** the built-in Python is old — install a current one with [Homebrew](https://brew.sh): `brew install python`.
+- **Windows:** install from [python.org/downloads](https://www.python.org/downloads/) — and **tick "Add python.exe to PATH"** in the installer.
+- **Linux:** your package manager (`sudo apt install python3` or equivalent).
+
+Then, from inside this `slides/` folder (`cd` into it — e.g. `cd student-tools/slides`), create an isolated environment and install the one dependency:
+
+```bash
+# Mac / Linux
 python3 -m venv .venv
 .venv/bin/pip install -e .
 ```
 
-To run `convert-slides` from anywhere, symlink the wrapper onto your PATH:
-
-```bash
-ln -s "$(pwd)/convert-slides" ~/.local/bin/convert-slides
+```powershell
+# Windows (PowerShell)
+py -m venv .venv
+.venv\Scripts\pip install -e .
 ```
 
-(Make sure `~/.local/bin` is on your `PATH`. If `convert-slides` isn't found after this, that's usually why.)
+That's it — nothing is installed system-wide, and the install creates a ready-to-run `convert-slides` command inside `.venv`.
 
 ---
 
 ## Usage
 
+From inside the `slides/` folder:
+
 ```bash
-# Auto-detect the chapter number from the filename
-convert-slides ~/Downloads/Chapter\ 3\ Slides.pptx
+# Mac / Linux — auto-detect the chapter number from the filename
+.venv/bin/convert-slides ~/Downloads/Chapter\ 3\ Slides.pptx
 # → writes ch03.md
 
 # Override the chapter number if detection gets it wrong
-convert-slides ~/Downloads/slides.pptx --chapter 04
+.venv/bin/convert-slides ~/Downloads/slides.pptx --chapter 04
 
 # Override the output path entirely
-convert-slides ~/Downloads/slides.pptx --out ~/Desktop/ch04.md
+.venv/bin/convert-slides ~/Downloads/slides.pptx --out ~/Desktop/ch04.md
 ```
 
-If you didn't symlink it, run it directly instead:
+```powershell
+# Windows — same flags, just the .venv\Scripts\ prefix
+.venv\Scripts\convert-slides "$HOME\Downloads\Chapter 3 Slides.pptx"
+.venv\Scripts\convert-slides "$HOME\Downloads\slides.pptx" --chapter 04
+.venv\Scripts\convert-slides "$HOME\Downloads\slides.pptx" --out "$HOME\Desktop\ch04.md"
+```
+
+**Optional / advanced (Mac & Linux only):** to run `convert-slides` from any folder without the `.venv/bin/` prefix, symlink the wrapper onto your PATH:
 
 ```bash
-.venv/bin/python src/slides/convert.py ~/Downloads/slides.pptx
+ln -s "$(pwd)/convert-slides" ~/.local/bin/convert-slides
 ```
+
+(This requires `~/.local/bin` to be on your PATH; if you don't know what that means, skip this — the `.venv/bin/convert-slides` form works fine.)
 
 ---
 
@@ -57,12 +85,18 @@ By default, converted files land in `~/textbook-slides/chNN.md`.
 To send them somewhere else (like an Obsidian vault folder), set the `SLIDES_DIR` environment variable:
 
 ```bash
+# Mac / Linux — add to ~/.zshrc (or ~/.bashrc) to make it stick
 export SLIDES_DIR="$HOME/Documents/Obsidian Vault/school/slides"
-convert-slides ~/Downloads/Chapter\ 3\ Slides.pptx
-# → writes to that folder instead
 ```
 
-Add the `export` line to your `~/.zshrc` (or `~/.bashrc`) to make it stick. The `--out` flag always wins over `SLIDES_DIR` for a single run.
+```powershell
+# Windows — current PowerShell window only:
+$env:SLIDES_DIR = "$HOME\Documents\Obsidian Vault\school\slides"
+# …or permanently (takes effect in NEW terminal windows):
+setx SLIDES_DIR "$HOME\Documents\Obsidian Vault\school\slides"
+```
+
+The `--out` flag always wins over `SLIDES_DIR` for a single run.
 
 ---
 
@@ -73,6 +107,6 @@ slides/
 ├── src/slides/
 │   ├── convert.py        # CLI entry point
 │   └── render.py         # pptx → markdown renderer
-├── convert-slides        # shell wrapper (symlink this onto your PATH)
+├── convert-slides        # shell wrapper (optional PATH convenience)
 └── pyproject.toml
 ```

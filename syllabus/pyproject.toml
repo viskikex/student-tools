@@ -1,0 +1,19 @@
+[project]
+name = "syllabus-converter"
+version = "0.1.0"
+description = "Convert a .docx or .pdf course syllabus to Obsidian-flavored markdown with an auto-extracted key-dates table."
+requires-python = ">=3.11"
+dependencies = [
+    "python-docx>=1.1",
+    "pypdf>=4.0",
+]
+
+[project.scripts]
+convert-syllabus = "syllabus.convert:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/syllabus"]

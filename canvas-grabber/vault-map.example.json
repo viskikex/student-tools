@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy to vault-map.json. Maps a Canvas course code to the sub-folder (under VAULT_DIR) where its canvas.md hub should be written, so it lands next to that class's notes/slides. The key is matched against each course's code — the bare prefix (e.g. \"PSYC201\") is easiest and survives section/term changes. Remove this _comment line in your real file.",
+  "PSYC201": "intro-psych"
+}

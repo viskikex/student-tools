@@ -1,0 +1,11 @@
+#!/bin/bash
+# Wrapper for the syllabus → markdown converter.
+# Resolves its own location, so it works even when symlinked onto your PATH.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+TOOL_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+exec "$TOOL_DIR/.venv/bin/python" "$TOOL_DIR/src/syllabus/convert.py" "$@"

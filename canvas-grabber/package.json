@@ -1,0 +1,25 @@
+{
+  "name": "canvas-grabber",
+  "version": "1.0.0",
+  "description": "Download your own Canvas LMS data and turn it into clean Markdown summaries of upcoming assignments and current grades.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Allie",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR-USERNAME/canvas-grabber.git"
+  },
+  "keywords": ["canvas", "lms", "instructure", "education", "scraper", "playwright"],
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "auth": "node --env-file-if-exists=.env auth.js",
+    "grab": "node --env-file-if-exists=.env grab.js",
+    "parse": "node --env-file-if-exists=.env parse.js",
+    "sync": "node --env-file-if-exists=.env auth.js && node --env-file-if-exists=.env grab.js && node --env-file-if-exists=.env parse.js"
+  },
+  "dependencies": {
+    "playwright": "^1.60.0"
+  }
+}

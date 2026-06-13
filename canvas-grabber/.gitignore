@@ -1,0 +1,10 @@
+.env
+vault-map.json
+.auth-state.json
+cookies.json
+output/
+sync-errors.log
+node_modules/
+.DS_Store
+.stfolder/
+.lmstudio/

@@ -1,6 +1,8 @@
 # kortext — textbook importer + summarizer
 
-Extracts chapter content from a [Kortext](https://kortext.com)-hosted eBook into a clean local markdown corpus, then (with [Claude Code](https://claude.com/claude-code)) generates chapter-level study notes.
+Extracts chapter content from a [Kortext](https://kortext.com)-hosted eBook into a clean local markdown corpus, then (optionally) generates chapter-level study notes.
+
+The import itself (steps 1–4 below) is plain Python and needs nothing else. The **study-notes part is optional** and uses [Claude Code](https://claude.com/claude-code) — a separate, free-to-install AI coding tool from Anthropic that you download and sign into on its own ([install instructions](https://claude.com/claude-code)). If you just want your textbook as markdown, you never need it.
 
 It works because Kortext serves its eBooks as structured XHTML through a normal web API — so instead of screen-scraping page images, this tool just downloads the chapter text directly and converts it to tidy markdown. One book is about 17 small requests.
 
@@ -24,19 +26,36 @@ It all opens cleanly in [Obsidian](https://obsidian.md).
 
 ## Setup (one time)
 
-You need **Python 3.11+**. Check with `python3 --version`.
+You need **Python 3.11 or newer**.
 
-From inside this `kortext/` folder:
+**First, open a terminal:**
+- **Mac:** press `Cmd+Space`, type "Terminal", hit Enter.
+- **Windows:** press the Windows key, type "PowerShell", hit Enter.
+- **Linux:** you know where it is.
+
+**Check your Python:**
 
 ```bash
-# 1. Create a virtual environment (an isolated place for this tool's dependencies)
+python3 --version        # Mac / Linux
+py --version             # Windows
+```
+
+If that prints 3.11 or newer, you're set. If not, grab a current Python from [python.org/downloads](https://www.python.org/downloads/) (on Windows, **tick "Add python.exe to PATH"** in the installer; on Mac, `brew install python` via [Homebrew](https://brew.sh) also works).
+
+**Then, from inside this `kortext/` folder** (`cd` into it — e.g. `cd student-tools/kortext`), create an isolated environment and install the tool plus the headless browser Playwright uses for login:
+
+```bash
+# Mac / Linux
 python3 -m venv .venv
-
-# 2. Install the tool's dependencies into it
 .venv/bin/pip install -e .
-
-# 3. Install the headless browser Playwright uses for login
 .venv/bin/playwright install chromium
+```
+
+```powershell
+# Windows (PowerShell)
+py -m venv .venv
+.venv\Scripts\pip install -e .
+.venv\Scripts\playwright install chromium
 ```
 
 That's it. You won't need to repeat this unless you move the folder.
@@ -46,6 +65,8 @@ That's it. You won't need to repeat this unless you move the folder.
 ## Using it — step by step
 
 There are three steps to import a book, plus an optional one to find a book's ID. All commands are run from inside this `kortext/` folder.
+
+> **On Windows:** in every command below, replace the `.venv/bin/python` prefix with `.venv\Scripts\python` — everything after it is the same.
 
 ### Step 1 — Log in (one time, or whenever your login expires)
 
@@ -87,9 +108,11 @@ Turns the downloaded files into clean, readable markdown chapters in `corpus/<sl
 
 ---
 
-## Making study notes
+## Making study notes (optional — needs Claude Code)
 
-This part needs [Claude Code](https://claude.com/claude-code). Open this folder in Claude Code and ask in plain language, e.g.:
+This part needs [Claude Code](https://claude.com/claude-code), which is **separate software**: an AI assistant that runs in your terminal, installed and signed into independently of this tool (it has free and paid plans — see [claude.com/claude-code](https://claude.com/claude-code) for setup). Everything above this section works without it.
+
+Once you have it, open this folder in Claude Code and ask in plain language, e.g.:
 
 > summarize chapter 3
 
