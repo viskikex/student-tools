@@ -30,7 +30,7 @@ You don't *have* to use Obsidian — it's all readable in any text editor — bu
 **First, get the code.** Everything lives in this one repo, so you grab it once:
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/student-tools.git
+git clone https://github.com/viskikex/student-tools.git
 cd student-tools
 ```
 
