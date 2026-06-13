@@ -17,9 +17,14 @@ kortext/corpus/*
 
 # Recon diagnostic output (may contain live tokens before redaction)
 **/probe_out/
+kortext/recon/network_log.txt
 
 # Converted slide output (default local dir)
 slides-output/
+
+# Root CLAUDE.md — local CC context, not part of the public repo.
+# Anchored leading slash so kortext/CLAUDE.md (tracked architecture ref) is unaffected.
+/CLAUDE.md
 
 # Editor / OS
 .DS_Store
