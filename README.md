@@ -9,6 +9,9 @@ A small collection of personal tools for studying. Each one lives in its own fol
 | [**slides/**](slides/) | Converts `.pptx` lecture slide decks into Markdown. |
 | [**syllabus/**](syllabus/) | Converts a syllabus (`.docx` or `.pdf`) into Markdown, led by an auto-extracted table of the dates it finds in the document. |
 
+## Disclaimer
+I only use macos, windows usability is theoretical although it should work....
+
 ## The idea
 
 Every tool here spits out **plain Markdown** — text files you own, sitting on your own disk. That's deliberate. Aim them all at a single [Obsidian](https://obsidian.md) vault (a free app that turns a folder of Markdown into a linked, searchable notebook) and you get one clean study dashboard where everything lives together:
