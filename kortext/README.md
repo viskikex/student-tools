@@ -20,6 +20,8 @@ For each book, a folder under `corpus/<slug>/` containing:
 - `_meta.json` — the book's parsed metadata
 - `raw/` — the original downloaded files (kept as a source of truth so markdown can always be regenerated)
 
+> **What it doesn't carry over:** tables and figures aren't converted — they're left as `[Table omitted in markdown]` / `[Figure — caption]` placeholders. Prose, section numbering, citations, and emphasis come through; if you need an original table or figure, it's in that chapter's `raw/` XHTML.
+
 It all opens cleanly in [Obsidian](https://obsidian.md).
 
 ---

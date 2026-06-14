@@ -122,7 +122,9 @@ CANVAS_BASE_URL=https://canvas.xxx.edu
 - Replace `your_netid_here` / `your_password_here` with your **real** Canvas login.
 - Set `CANVAS_BASE_URL` to **your school's** Canvas address — the web address you normally use to log into Canvas (e.g. `https://canvas.xxx.edu`). This is **required**; the tool won't run without it.
 
-The example file also lists a few optional settings (output folder, timezone, login host) you can ignore unless you need them.
+The example file also lists a few optional settings (output folder, login host) you can ignore unless you need them.
+
+> 🕒 **Due times default to Mountain Time (`America/Denver`).** If you're in another timezone, set `CANVAS_TZ` in `.env` (e.g. `CANVAS_TZ=America/New_York` or `CANVAS_TZ=Europe/London`) or your due *times* will be off by a few hours — the dates stay correct, only the clock time shifts. (Zone names come from the standard "tz database"; search that term for the full list.)
 
 > 🔒 **Important:** `.env` contains your real password. Never commit it to git, never email it, never paste it anywhere. It's already listed in `.gitignore` so git ignores it by default — keep it that way. (See [Security & privacy](#security--privacy).)
 

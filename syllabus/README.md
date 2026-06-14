@@ -2,7 +2,7 @@
 
 Converts a course syllabus (`.docx` from Word/Google Docs, or `.pdf` — including Canvas's "print syllabus" pages) into clean markdown, so it can live in [Obsidian](https://obsidian.md) next to your notes, slides, and Canvas data.
 
-The output leads with a **Key dates table**: every date mentioned anywhere in the document, sorted chronologically, with the computed weekday and the sentence it came from. No AI involved — it's plain pattern-matching, which means it's fast, free, runs offline, and never invents a date that isn't in the document. The full converted syllabus follows below the table.
+The output leads with a **Key dates table**: every date it recognizes — month-name (`February 13`) or numeric (`4/5/26`) — sorted chronologically, with the computed weekday and the sentence it came from. No AI involved — it's plain pattern-matching, which means it's fast, free, runs offline, and never invents a date that isn't in the document. The full converted syllabus follows below the table.
 
 A nice side effect of the computed weekday: it catches professor typos. If the syllabus says "Friday, January 15" and the table says `Thu`, one of them is wrong — and it isn't the calendar.
 
@@ -110,7 +110,7 @@ The `--out` flag always wins over `SYLLABUS_DIR` for a single run.
 **Does:**
 - `.docx`: preserves headings (including school-template styles like "SyllabusHeading1"), bulleted/numbered lists, and tables. Hand-bolded section labels ("Office Hours" in bold instead of a real heading style) are detected and promoted to headings.
 - `.pdf`: extracts the text and repairs the broken ligatures Canvas's print-to-PDF produces (`Informa!on` → `Information`).
-- Finds dates in most formats: `February 13`, `Feb. 13th, 2026`, `04/05`, `4/5/26`. Dates without a year get the year the document mentions most often.
+- Finds dates in most formats: `February 13`, `Feb. 13th, 2026`, `04/05`, `4/5/26`. **Day-first (`13 February`) and ISO (`2026-02-13`) dates aren't recognized** — month-name-first and `M/D` numeric only. Dates without a year get the year the document mentions most often.
 
 **Doesn't:**
 - Parse the schedule *structure*. Every professor lays out their schedule differently (week-by-week, module-based prose, tables, …) — a deterministic tool that pretended to understand all of them would be quietly wrong. The flat date table is the honest version: complete, sorted, with context, and you do the judging.

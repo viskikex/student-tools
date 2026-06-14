@@ -7,7 +7,7 @@ A small collection of personal tools for studying. Each one lives in its own fol
 | [**canvas-grabber/**](canvas-grabber/) | Downloads your own data from [Canvas](https://www.instructure.com/canvas) (assignments, grades, files, and more) and turns it into clean Markdown summaries of what's due and how you're doing. |
 | [**kortext/**](kortext/) | Extracts chapters from a [Kortext](https://kortext.com)-hosted eBook into a clean local Markdown corpus, then generates chapter study notes. Works with [Claude Code](https://claude.com/claude-code). |
 | [**slides/**](slides/) | Converts `.pptx` lecture slide decks into Markdown. |
-| [**syllabus/**](syllabus/) | Converts a syllabus (`.docx` or `.pdf`) into Markdown, led by an auto-extracted table of every date in the document. |
+| [**syllabus/**](syllabus/) | Converts a syllabus (`.docx` or `.pdf`) into Markdown, led by an auto-extracted table of the dates it finds in the document. |
 
 ## The idea
 
@@ -62,5 +62,5 @@ Not sure if you have these? Open a terminal and type `node --version` or `python
 
 These tools only ever touch **your own** stuff, using **your own** logins — they don't break into anything. But two of them come with caveats worth reading before you start:
 
-- **canvas-grabber** logs into Canvas as you and downloads your own data. Canvas normally offers an official "access token" for this; some schools switch that off for students, and this tool is the workaround for those schools. Going around a disabled feature *may* bump up against your school's acceptable-use policy — that's yours to check. It also downloads things like class rosters and your inbox, so treat the output folder as private. See [`canvas-grabber/README.md`](canvas-grabber/README.md#security--privacy).
+- **canvas-grabber** logs into Canvas as you and downloads your own data. Canvas normally offers an official "access token" for this; some schools switch that off for students, and this tool is the workaround for those schools. Going around a disabled feature *may* bump up against your school's acceptable-use policy — that's yours to check. It also downloads things like class rosters (your classmates' names), so treat the output folder as private. See [`canvas-grabber/README.md`](canvas-grabber/README.md#security--privacy).
 - **kortext** only works with eBooks you already have legitimate access to through your own account, and is for **personal study use only**. See [`kortext/README.md`](kortext/README.md#legal--terms-of-service) for the full disclaimer.
