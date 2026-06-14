@@ -178,6 +178,7 @@ Most of the work is just setting `CANVAS_BASE_URL` in your `.env` (see [step 4](
 The one part that can still trip up is the **login page**, because every school's SSO is laid out differently. If `npm run auth` fails or times out:
 
 - **The login URL is different.** The tool expects to be redirected to `login.<your-domain>` (e.g. `canvas.xxx.edu` → `login.xxx.edu`). If your school's SSO lives somewhere else, set `CANVAS_LOGIN_HOST` in your `.env` to that host (e.g. `CANVAS_LOGIN_HOST=sso.xxx.edu`).
+- **Your login happens on the Canvas page itself (no redirect).** Some schools — including many on `*.instructure.com` — don't bounce you to a separate sign-on host; you type your password right on the Canvas domain. The default guess (`login.<your-domain>`) is then wrong and login will time out waiting for a redirect that never comes. Set `CANVAS_LOGIN_HOST` to the Canvas host itself (e.g. `CANVAS_LOGIN_HOST=myschool.instructure.com`).
 - **The username/password boxes are named differently.** The tool tries the common field names (`username`, `password`, and a submit button). If your school uses unusual field names, you'll need to edit the selectors in `auth.js` (the `page.fill(...)` lines in the `login` function). This is the one spot that may need a technical hand.
 
 **This is a known limitation, not a bug you're causing.**

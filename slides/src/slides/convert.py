@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a .pptx lecture slide deck to markdown for gap analysis.
+r"""Convert a .pptx lecture slide deck to markdown for gap analysis.
 
 Usage:
     convert-slides <input.pptx> [--chapter NN] [--out PATH]
@@ -46,7 +46,10 @@ _CHAPTER_PATTERNS = [
     r"mod(?:ule)?[\s_-]*(\d+)",        # module3, mod3
     r"lec(?:ture)?[\s_-]*(\d+)",       # lecture3, lec3
     r"unit[\s_-]*(\d+)",               # unit3
-    r"(?:^|[\s_-])(\d+)(?:[\s_-]|$)", # bare number at word boundary
+    # Bare number at a word boundary, last resort. Capped at 1-2 digits so a
+    # stray course number (1100) or year (2024) doesn't get read as a chapter;
+    # 3+ digit runs are skipped. Ambiguous cases should use --chapter.
+    r"(?:^|[\s_-])(\d{1,2})(?:[\s_-]|$)",
 ]
 
 

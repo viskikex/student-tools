@@ -19,7 +19,7 @@ Every tool here spits out **plain Markdown** — text files you own, sitting on 
 - **The syllabus**, with every date pulled into one table — from the syllabus converter
 - **Your own notes** — written right alongside all of it
 
-No dashboard to log into, no five tabs to keep open, nothing that silently breaks when a site redesigns. It's just files. They work offline, they're yours to keep, and **nothing needs refreshing** — when you want fresher data, you re-run a tool; the rest of the time it all just sits there, instantly readable. Organize each class as a folder, and your assignments, reading, slides, and notes for that course are all in one place, side by side.
+No dashboard to log into, no five tabs to keep open, no live integration to rot. It's just files. They work offline, they're yours to keep, and **nothing needs refreshing** — when you want fresher data, you re-run a tool; the rest of the time it all just sits there, instantly readable. Organize each class as a folder, and your assignments, reading, slides, and notes for that course are all in one place, side by side.
 
 You don't *have* to use Obsidian — it's all readable in any text editor — but that's the workflow these were built for.
 
@@ -64,3 +64,7 @@ These tools only ever touch **your own** stuff, using **your own** logins — th
 
 - **canvas-grabber** logs into Canvas as you and downloads your own data. Canvas normally offers an official "access token" for this; some schools switch that off for students, and this tool is the workaround for those schools. Going around a disabled feature *may* bump up against your school's acceptable-use policy — that's yours to check. It also downloads things like class rosters (your classmates' names), so treat the output folder as private. See [`canvas-grabber/README.md`](canvas-grabber/README.md#security--privacy).
 - **kortext** only works with eBooks you already have legitimate access to through your own account, and is for **personal study use only**. See [`kortext/README.md`](kortext/README.md#legal--terms-of-service) for the full disclaimer.
+
+## License
+
+[MIT](LICENSE) — short and permissive: do what you like, just keep the copyright notice. This root license covers the whole repo; `canvas-grabber/` also ships its own identical copy.

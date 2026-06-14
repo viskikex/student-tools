@@ -4,6 +4,8 @@ Converts `.pptx` lecture slide decks into markdown, so lecture content can sit a
 
 The chapter number is auto-detected from the filename (it understands `ch3`, `chapter3`, `PP3`, `week3`, `lec3`, `module3`, and more).
 
+> If the filename has no chapter-style keyword but does carry a stray number — a course number (`PSYC 1100`) or a year (`2024`) — detection can latch onto the wrong one. It ignores 3+ digit runs to avoid the worst of this, but when in doubt pass `--chapter NN` to set it explicitly.
+
 ---
 
 ## Setup (one time)

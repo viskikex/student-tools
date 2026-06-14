@@ -39,6 +39,9 @@ def main() -> int:
         input("press Enter when logged in > ")
 
         context.storage_state(path=str(AUTH_STATE_PATH))
+        # This file holds a live session (account access without re-login), so
+        # restrict it to the owner. On Windows chmod is a near-no-op but harmless.
+        AUTH_STATE_PATH.chmod(0o600)
         print(f"saved auth state → {AUTH_STATE_PATH.relative_to(PROJECT_ROOT)}")
         browser.close()
     return 0

@@ -78,6 +78,8 @@ There are three steps to import a book, plus an optional one to find a book's ID
 
 This opens a real browser window. Log into Kortext like you normally would, then come back to the terminal and press **Enter**. Your login is saved to `auth-state.json` so the next steps can run on their own.
 
+> 🔒 **Treat `auth-state.json` like a password.** It's a live session — anyone who gets the file can reach your Kortext account without logging in. It's gitignored and written owner-only (`chmod 600`); don't commit, share, or sync it. If it leaks, log out of Kortext in your browser to invalidate the session, then re-run this step.
+
 > If a later step fails with an "unauthorized" or "401" error, your saved login has expired — just run this step again.
 
 ### Step 2 (optional) — Find the book's ID
