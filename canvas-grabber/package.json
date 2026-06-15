@@ -18,6 +18,8 @@
     "auth": "node --env-file-if-exists=.env auth.js",
     "grab": "node --env-file-if-exists=.env grab.js",
     "parse": "node --env-file-if-exists=.env parse.js",
+    "readings": "node --env-file-if-exists=.env readings.js",
+    "convert-slides": "bash convert-canvas-slides.sh",
     "sync": "node --env-file-if-exists=.env auth.js && node --env-file-if-exists=.env grab.js && node --env-file-if-exists=.env parse.js"
   },
   "dependencies": {

@@ -26,4 +26,17 @@ if ! npm run parse; then
   exit 1
 fi
 
+# Reading week-view + (opt-in) file downloads. Set DOWNLOAD_READINGS=1 in the
+# environment to actually pull files; without it this just writes the index.
+# Non-fatal: a reading hiccup shouldn't sink the whole sync.
+if ! npm run readings; then
+  echo "$(date): readings step failed (non-fatal)" >> "$LOG"
+fi
+
+# Convert any downloaded .pptx decks to markdown via the standalone slides/ tool.
+# No-ops cleanly if nothing was queued or the slides venv isn't set up.
+if ! npm run convert-slides; then
+  echo "$(date): slide conversion failed (non-fatal)" >> "$LOG"
+fi
+
 echo "$(date): Canvas sync complete."

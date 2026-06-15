@@ -171,6 +171,50 @@ The key just has to be a chunk of the Canvas course code (the bare prefix is eas
 
 ---
 
+## Readings & a per-course week view
+
+`npm run readings` turns each course's **Canvas modules** into a `canvas-readings.md`
+"week view" — one section per module (modules are where the week structure lives;
+Canvas exposes no machine-readable week date, so the module name *is* the week), with
+every item classified by kind (📖 reading, 🖥️ slides, 📋 syllabus, ✅ rubric, ▶️ video,
+🔗 link…). When a module name contains a parseable date range, the current week is
+flagged `📍 this week`.
+
+By itself this just **indexes** — no files are downloaded and no login is needed. To
+also pull the files down into your vault, opt in with `DOWNLOAD_READINGS=1`:
+
+```bash
+DOWNLOAD_READINGS=1 npm run readings
+```
+
+Files land under `<course>/readings/<NN module>/…` next to that class's notes. Guard
+rails (all overridable as env vars):
+
+| Knob | Default | What it does |
+|------|---------|--------------|
+| `DOWNLOAD_READINGS` | off | Must be `1` to download anything at all. |
+| `READINGS_DRY_RUN` | off | List what *would* download (and the total size) without writing. |
+| `READINGS_COURSE` | all | Limit to one course (short code, e.g. `PSYX362`). |
+| `MAX_FILE_MB` | `50` | Skip any single file bigger than this. |
+| `MAX_TOTAL_MB` | `500` | Stop once a run has pulled this much (disk budget). |
+
+The size cap is checked against Canvas's file metadata *before* downloading, so a giant
+video is skipped without ever starting the transfer. Images and videos are skipped by
+default; downloads are atomic and skip files already present, so re-running is cheap.
+
+**Slides → markdown:** any `.pptx` tagged as slides is queued for the standalone
+[`slides/`](../slides) tool, which converts it to markdown in `<course>/slides/`. Run
+the conversion with:
+
+```bash
+npm run convert-slides     # needs ../slides/.venv set up — see slides/README.md
+```
+
+`canvas-sync.sh` runs both steps automatically after the normal sync (the download is
+still opt-in via `DOWNLOAD_READINGS`).
+
+---
+
 ## Using a different school
 
 Most of the work is just setting `CANVAS_BASE_URL` in your `.env` (see [step 4](#4-create-your-env-file)). For many schools that's all you need.
