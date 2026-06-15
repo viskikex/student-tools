@@ -50,7 +50,8 @@ const KIND_ICON = {
 };
 
 let totalBytes = 0;
-const queue = [];           // [pptxPath, mdOutPath] for the slides tool
+const queue = [];            // [pptxPath, mdOutPath, chapter] for the slides tool
+const usedSlidePaths = new Set(); // detect two decks mapping to the same chNN.md
 const summary = { downloaded: 0, present: 0, tooBig: 0, skippedType: 0, locked: 0, failed: 0, budgetStop: false };
 
 async function readJSON(path) {
@@ -115,22 +116,30 @@ const MONTHS = {
   september: 8, october: 9, november: 10, december: 11,
 };
 
-// Parse "June 8th - June 14th" / "January 19-25" / "May 18 - May 24" -> [start,end].
-function parseWeekRange(name, year) {
+// Parse "June 8th - June 14th" / "January 19-25" / "May 18 - May 24" into month/day
+// parts (year-agnostic — the caller anchors the year, since module names never carry one).
+function parseWeekParts(name) {
   const m = name.match(/([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\s*[-–—]\s*(?:([a-z]+)\.?\s+)?(\d{1,2})(?:st|nd|rd|th)?/i);
   if (!m) return null;
   const m1 = MONTHS[m[1].toLowerCase()];
   if (m1 == null) return null;
   const m2 = m[3] ? MONTHS[m[3].toLowerCase()] : m1;
   if (m2 == null) return null;
-  const start = new Date(year, m1, Number(m[2]));
-  const end = new Date(year, m2, Number(m[4]), 23, 59, 59);
-  return [start, end];
+  return { m1, d1: Number(m[2]), m2, d2: Number(m[4]) };
 }
 
 function isCurrentWeek(name, now) {
-  const r = parseWeekRange(name, now.getFullYear());
-  return r ? now >= r[0] && now <= r[1] : false;
+  const p = parseWeekParts(name);
+  if (!p) return false;
+  // Try anchoring the start in this year and last year, so a range that wraps the
+  // New Year (e.g. "Dec 29 - Jan 4") still matches whether `now` falls in Dec or Jan.
+  // When m2 < m1 the end rolls into the following year.
+  for (const sy of [now.getFullYear() - 1, now.getFullYear()]) {
+    const start = new Date(sy, p.m1, p.d1);
+    const end = new Date(p.m2 < p.m1 ? sy + 1 : sy, p.m2, p.d2, 23, 59, 59);
+    if (now >= start && now <= end) return true;
+  }
+  return false;
 }
 
 // ---- slide chapter detection (mirrors slides/ tool + handles spelled-out numbers) ----
@@ -143,11 +152,13 @@ const NUMWORDS = {
 
 function chapterTag(name) {
   const s = (name ?? '').toLowerCase();
-  let m = s.match(/ch(?:p|ap(?:ter)?)?[\s_-]*(\d{1,2})/)
+  // \b-anchor the "ch" forms so they don't latch onto the "ch" buried in unrelated
+  // words: "March 3" -> ch03, "Research 7" -> ch07 without it.
+  let m = s.match(/\bch(?:p|ap(?:ter)?)?[\s_-]*(\d{1,2})/)
     || s.match(/\bpp[\s_-]*(\d{1,2})/)
     || s.match(/\b(?:week|wk|module|mod|unit|lec(?:ture)?)[\s_-]*(\d{1,2})/);
   if (m) return String(Number(m[1])).padStart(2, '0');
-  m = s.match(/ch(?:apter)?[\s_-]*([a-z]+)/);
+  m = s.match(/\bch(?:apter)?[\s_-]*([a-z]+)/);
   if (m && NUMWORDS[m[1]]) return String(NUMWORDS[m[1]]).padStart(2, '0');
   return null;
 }
@@ -182,6 +193,21 @@ function slideTarget(folder, item, meta) {
   const stem = (meta.display_name || item.title || 'slides').replace(/\.[^.]+$/, '');
   const name = chapter ? `ch${chapter}.md` : `${safeName(stem, 'slides')}.md`;
   return { path: join(TARGET_DIR, folder, 'slides', name), chapter: chapter ?? '' };
+}
+
+// If two decks resolve to the same chNN.md, suffix the later one instead of letting
+// the conversion silently clobber the first (parse.js disambiguates hub collisions
+// the same way).
+function dedupeSlidePath(p) {
+  if (!usedSlidePaths.has(p)) { usedSlidePaths.add(p); return p; }
+  const ext = extname(p);
+  const base = p.slice(0, p.length - ext.length);
+  let i = 2;
+  while (usedSlidePaths.has(`${base}-${i}${ext}`)) i++;
+  const np = `${base}-${i}${ext}`;
+  usedSlidePaths.add(np);
+  console.warn(`    ⚠ two decks map to ${basenameNoDir(p)} — writing ${basenameNoDir(np)} instead`);
+  return np;
 }
 
 // ---- gather: active courses from disk, in a uniform shape ----
@@ -263,6 +289,20 @@ async function downloadCourse(c, folder) {
       const size = meta.size ?? 0;
       const mb = (size / 1048576).toFixed(1);
       const fname = safeName(meta.display_name || it.title, `file-${it.content_id}`);
+      const dest = join(TARGET_DIR, folder, 'readings', moduleDir(m), fname);
+      const isPptx = it.kind === 'slides' && /\.pptx?$/i.test(fname);
+      const tgt = isPptx ? slideTarget(folder, it, meta) : null;
+      if (tgt) tgt.path = dedupeSlidePath(tgt.path);
+
+      // idempotent: skip if already present at the right size. Checked BEFORE the
+      // size/budget gates — a file already on disk costs zero new bytes, so it must
+      // not count toward the run budget (or it could falsely abort the run).
+      if (existsSync(dest) && statSync(dest).size === size) {
+        summary.present++;
+        it._local = dest;
+        if (isPptx) { it._md = tgt.path; if (!existsSync(tgt.path)) queue.push([dest, tgt.path, tgt.chapter]); }
+        continue;
+      }
 
       if (size > MAX_FILE_BYTES) {
         summary.tooBig++;
@@ -273,18 +313,6 @@ async function downloadCourse(c, folder) {
         summary.budgetStop = true;
         console.log(`    ⏹ run budget reached (${(MAX_TOTAL_BYTES / 1048576).toFixed(0)}MB) — stopping downloads`);
         return;
-      }
-
-      const dest = join(TARGET_DIR, folder, 'readings', moduleDir(m), fname);
-      const isPptx = it.kind === 'slides' && /\.pptx?$/i.test(fname);
-      const tgt = isPptx ? slideTarget(folder, it, meta) : null;
-
-      // idempotent: skip if already present at the right size
-      if (existsSync(dest) && statSync(dest).size === size) {
-        summary.present++;
-        it._local = dest;
-        if (isPptx) { it._md = tgt.path; if (!existsSync(tgt.path)) queue.push([dest, tgt.path, tgt.chapter]); }
-        continue;
       }
 
       if (DRY_RUN) {
@@ -311,11 +339,21 @@ async function downloadCourse(c, folder) {
 // ---- emit per-course week-view markdown ----
 
 function sourceCell(it) {
+  // Basenames are safeName()'d (no [ ] | ), so the wikilink can't be forged.
   if (it._md) return `[[${basenameNoDir(it._md)}]]`;       // converted slide markdown
   if (it._local) return `[[${basenameNoDir(it._local)}]]`; // downloaded file
-  if (it.type === 'ExternalUrl' && it.external_url) return `[link](${it.external_url})`;
-  if (it.html_url) return `[Canvas](${it.html_url})`;
+  if (it.type === 'ExternalUrl' && it.external_url) return urlSource('link', it.external_url);
+  if (it.html_url) return urlSource('Canvas', it.html_url);
   return '—';
+}
+
+// Build a table-safe markdown link. Canvas URLs (especially instructor-set
+// external_url) are untrusted: a literal `|` would split the table row and a `)`
+// would truncate a normal `[text](url)`. Wrap the destination in <> (which tolerates
+// parens) and neutralize the chars that break the table or the wrapper.
+function urlSource(label, url) {
+  const u = String(url ?? '').replace(/\s+/g, '').replace(/\|/g, '%7C').replace(/>/g, '%3E');
+  return `[${label}](<${u}>)`;
 }
 
 function basenameNoDir(p) {
@@ -362,8 +400,17 @@ async function main() {
   if (DOWNLOAD) console.log(DRY_RUN ? '(dry run — nothing will be written to disk)' : '(download mode ON)');
   else console.log('(index only — set DOWNLOAD_READINGS=1 to fetch files)');
 
+  const root = resolve(TARGET_DIR);
   for (const c of courses) {
     const folder = resolveFolder(c, map);
+    // Containment guard up front, so a hand-edited vault-map value (e.g. "../../x")
+    // can't make the DOWNLOAD step write outside TARGET_DIR. writeReadingsMd checks
+    // this too, but downloads run first.
+    const dir = resolve(join(TARGET_DIR, folder));
+    if (dir !== root && !dir.startsWith(root + sep)) {
+      console.warn(`  skipping ${c.shortCode}: folder "${folder}" resolves outside TARGET_DIR`);
+      continue;
+    }
     console.log(`\n[${c.shortCode}] -> ${folder}`);
     if (DOWNLOAD && !summary.budgetStop) await downloadCourse(c, folder);
     await writeReadingsMd(c, folder, now);
