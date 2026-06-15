@@ -42,6 +42,15 @@ def slugify(stem: str) -> str:
     return slug or "syllabus"
 
 
+def _defang(text: str) -> str:
+    """Neutralize Obsidian wikilinks/embeds (``[[note]]`` / ``![[note]]``) in
+    untrusted syllabus text with a zero-width space after the first bracket, so a
+    syllabus can't pull other vault notes into the output. Mirrors canvas-grabber's
+    inline() defang. Safe to apply to converter output, which never emits real
+    wikilinks."""
+    return text.replace("[[", "[​[")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Convert a .docx or .pdf syllabus to markdown with a key-dates table."
@@ -94,7 +103,7 @@ def main() -> None:
         output_path = SYLLABUS_DIR / f"{slugify(input_path.stem)}.md"
 
     md = "\n".join([
-        f"# {input_path.stem}",
+        f"# {_defang(input_path.stem)}",
         "",
         f"> Converted from `{input_path.name}` on {date.today():%Y-%m-%d}. "
         f"The key dates below are auto-extracted (assumed year: {year}) — "
@@ -106,7 +115,7 @@ def main() -> None:
         "",
         "---",
         "",
-        body,
+        _defang(body),
     ])
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

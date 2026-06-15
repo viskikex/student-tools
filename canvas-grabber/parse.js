@@ -22,23 +22,28 @@ async function readJSON(path) {
   }
 }
 
+// toLocaleString (not toLocaleDateString) is the date+time API — the hour/minute
+// options below are only honored there. Guard Invalid Date so a malformed due_at
+// renders as '—' instead of the literal string "Invalid Date".
 function formatDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
     hour: 'numeric', minute: '2-digit', timeZone: TZ
   });
 }
 
 function humanStamp(d = new Date()) {
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
     hour: 'numeric', minute: '2-digit', timeZone: TZ
   });
 }
 
 function cleanCourseName(code) {
-  return code
+  return String(code ?? '')               // guard null/non-string, as courseShortCode/inline/cleanTitle do
     .replace(/-\d.*$/, '')               // drop -50-30057-Spring Semester 2026 (section onward)
     .replace(/[A-Z]\.\d+$/, '')          // drop section suffix like S.01 or N.01
     .replace(/\.\d+$/, '')               // drop trailing .50 section number

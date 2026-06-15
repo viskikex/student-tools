@@ -54,10 +54,12 @@ It depends which tool you're using — each README spells it out, but in short:
 
 | Tool | Needs | Works on |
 |------|-------|----------|
-| **canvas-grabber** | [Node.js](https://nodejs.org) 20.12 or newer | macOS, Windows, Linux |
-| **kortext** | [Python](https://www.python.org) 3.11 or newer | macOS, Windows, Linux |
+| **canvas-grabber** | [Node.js](https://nodejs.org) 20.12 or newer (+ a one-time browser-engine download for login) | macOS, Windows, Linux |
+| **kortext** | [Python](https://www.python.org) 3.11 or newer (+ a one-time browser-engine download for login) | macOS, Windows, Linux |
 | **slides** | [Python](https://www.python.org) 3.11 or newer | macOS, Windows, Linux |
 | **syllabus** | [Python](https://www.python.org) 3.11 or newer | macOS, Windows, Linux |
+
+> The two login-based tools (**canvas-grabber**, **kortext**) each download a [Playwright](https://playwright.dev) browser engine on first setup (~150 MB once) to drive their sign-on; **slides** and **syllabus** are pure Python with no extra downloads.
 
 Not sure if you have these? Open a terminal and type `node --version` or `python3 --version` — if you see a version number, you're set; if not, the links above will get you there.
 

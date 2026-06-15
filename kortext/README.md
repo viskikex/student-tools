@@ -66,7 +66,7 @@ That's it. You won't need to repeat this unless you move the folder.
 
 ## Using it — step by step
 
-There are three steps to import a book, plus an optional one to find a book's ID. All commands are run from inside this `kortext/` folder.
+There are three steps to import a book — **log in → download → build** — plus an optional one (between log-in and download) to find a book's ID. All commands are run from inside this `kortext/` folder.
 
 > **On Windows:** in every command below, replace the `.venv/bin/python` prefix with `.venv\Scripts\python` — everything after it is the same.
 
@@ -82,17 +82,17 @@ This opens a real browser window. Log into Kortext like you normally would, then
 
 > If a later step fails with an "unauthorized" or "401" error, your saved login has expired — just run this step again.
 
-### Step 2 (optional) — Find the book's ID
+### Optional — Find the book's ID
 
 ```bash
 .venv/bin/python .claude/skills/kortext-import/scripts/discover.py
 ```
 
-This lists the books in your Kortext library with their IDs. You can also get a book's ID straight from its reader URL — it's the number in the address bar when you have the book open.
+This *tries* to list the books in your library with their IDs — but Kortext's library endpoint isn't always reachable and its response shape varies, so the script may just print raw JSON without a tidy book list. **The dependable way to get an ID is straight from the reader URL:** open the book in Kortext and it's the number in the address bar. Treat `discover.py` as a convenience, the reader URL as the fallback that always works.
 
 You'll also pick a **slug** — a short, hyphenated name for the folder this book gets saved in (for example `intro-psych` or `social-work-200`).
 
-### Step 3 — Download the book
+### Step 2 — Download the book
 
 ```bash
 .venv/bin/python .claude/skills/kortext-import/scripts/scrape.py \
@@ -101,7 +101,9 @@ You'll also pick a **slug** — a short, hyphenated name for the folder this boo
 
 Downloads every chapter into `corpus/<slug>/raw/`. Safe to re-run — it skips anything already downloaded, so if your connection drops partway, just run it again.
 
-### Step 4 — Build the markdown
+> Two optional flags: **`--force`** re-downloads even files already present (use it if a chapter came down corrupt or truncated), and **`--only-chapter N`** fetches just chapter `N` instead of the whole book.
+
+### Step 3 — Build the markdown
 
 ```bash
 .venv/bin/python .claude/skills/kortext-import/scripts/build_markdown.py \
@@ -135,7 +137,7 @@ The two skills that power this live in `.claude/skills/` and load automatically 
 |---------|---------------|-----|
 | `unauthorized` / `401` error during scrape | Your saved login expired | Re-run Step 1 (`auth.py`) |
 | `No module named 'playwright'` | Dependencies aren't installed | Re-run the Setup steps inside this folder |
-| A chapter's markdown comes out mostly empty | That chapter's source had an unusual structure | Open the matching file in `corpus/<slug>/raw/` to inspect; the renderer lives in `src/kortext/render.py` |
+| A chapter's markdown comes out mostly empty | That chapter's source had an unusual structure — or the raw download was incomplete | Open the matching file in `corpus/<slug>/raw/` to inspect. If the raw XHTML itself looks truncated, re-pull just that chapter (`scrape.py --book-id <id> --slug <slug> --force --only-chapter N`) then rebuild it (`build_markdown.py --slug <slug> --only-chapter N`). If the raw looks fine, the renderer lives in `src/kortext/render.py` |
 | Login window never appears | Playwright's browser isn't installed | Run `.venv/bin/playwright install chromium` |
 
 If Kortext changes their website and the tool stops working, the diagnostic scripts in [`recon/`](recon/) exist to help figure out what changed. See `recon/README.md`.

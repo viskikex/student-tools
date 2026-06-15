@@ -24,9 +24,17 @@ from pptx.enum.text import PP_ALIGN
 # Text extraction helpers
 # ---------------------------------------------------------------------------
 
+def _defang(text: str) -> str:
+    """Neutralize Obsidian wikilinks/embeds (``[[note]]`` / ``![[note]]``) in
+    untrusted slide text by inserting a zero-width space after the first bracket.
+    Without this, a deck's text could pull other vault notes into the converted
+    output. Mirrors canvas-grabber's inline() defang."""
+    return text.replace("[[", "[​[")
+
+
 def _clean(text: str) -> str:
-    """Normalize whitespace and strip control chars."""
-    return re.sub(r"[ \t]+", " ", text).strip()
+    """Normalize whitespace, strip control chars, and defang wikilinks."""
+    return _defang(re.sub(r"[ \t]+", " ", text).strip())
 
 
 def _para_to_bullets(para, indent: int = 0) -> str | None:
@@ -144,7 +152,9 @@ def pptx_to_markdown(pptx_path: Path, chapter: str | None = None) -> str:
         deck_title = pptx_path.stem
 
     chapter_label = f"Ch {chapter} — " if chapter else ""
-    header = f"# {chapter_label}{deck_title}\n\n*Source: {pptx_path.name}*"
+    # deck_title may be the filename stem (not run through _clean), and the source
+    # name is interpolated outside a code span, so defang both here.
+    header = f"# {chapter_label}{_defang(deck_title)}\n\n*Source: {_defang(pptx_path.name)}*"
 
     slide_sections = []
     for i, slide in enumerate(prs.slides, start=1):

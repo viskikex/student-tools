@@ -47,8 +47,10 @@ def _clean_context(line: str) -> str:
     text = re.sub(r"\s+", " ", line).strip(" #|->*•\t").strip()
     if len(text) > 110:
         text = text[:107].rstrip() + "…"
-    # Contexts land in a markdown table; keep pipes from breaking it
-    return text.replace("|", "\\|")
+    # Contexts land in a markdown table: keep pipes from breaking it, and defang
+    # Obsidian wikilinks/embeds ([[note]] / ![[note]]) with a zero-width space
+    # after the first bracket so a syllabus line can't pull in other vault notes.
+    return text.replace("[[", "[​[").replace("|", "\\|")
 
 
 def _safe_date(year: int, month: int, day: int) -> date | None:

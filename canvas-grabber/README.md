@@ -34,7 +34,7 @@ It also dumps the raw data it pulled from Canvas into `output/` as JSON (courses
 
 The tool runs in these steps:
 
-1. **Auth** — Opens a real browser window and logs you into Canvas through your university's single sign-on (SSO) page using the username and password in your `.env` file. It saves the session to `.auth-state.json` so it doesn't have to log in every single time.
+1. **Auth** — First checks whether your saved session (`.auth-state.json`) is still valid; if it is, this step does nothing and no browser opens. Only when you actually need to log in — the first run, or after the session has expired — does it open a real browser window and sign you in through your university's single sign-on (SSO) page using the credentials in your `.env`, saving the refreshed session.
 2. **Grab** — Calls Canvas's official API and saves everything about your courses as JSON files in `output/`.
 3. **Parse** — Reads those JSON files and writes the friendly Markdown (a per-course `canvas.md` hub plus the `_upcoming.md` / `_grades.md` dashboards).
 4. **Readings** — Builds each course's `canvas-readings.md` week view from its modules. By default this just indexes (no login, no downloads); set `DOWNLOAD_READINGS=1` to also pull the files, and any `.pptx` decks are then handed to the [`slides/`](../slides) tool for conversion to Markdown. See [Readings & a per-course week view](#readings--a-per-course-week-view).
@@ -169,7 +169,11 @@ VAULT_DIR=/path/to/Obsidian Vault/school
 
 The key just has to be a chunk of the Canvas course code (the bare prefix is easiest and survives section/term changes); the value is the sub-folder under `VAULT_DIR`. Any course with no mapping still works — its hub just lands in a folder named after its course code, which you can map later. `vault-map.json` is gitignored, like `.env`.
 
+> By default the map is read from `vault-map.json` in the tool folder. To keep it somewhere else (e.g. inside your vault), set `VAULT_MAP` in `.env` to its path: `VAULT_MAP=/path/to/Obsidian Vault/.canvas-map.json`.
+
 **3. Run it** with `npm run sync` as usual.
+
+> **Other destination knobs (rarely needed).** If you set no `VAULT_DIR`, output stays in `output/`. `SUMMARY_DIR` is a fallback destination used **only** when `VAULT_DIR` is unset — it just relocates the Markdown (defaults to `output/`). Most people use `VAULT_DIR` (or neither) and can ignore `SUMMARY_DIR`.
 
 ---
 
@@ -224,6 +228,7 @@ Most of the work is just setting `CANVAS_BASE_URL` in your `.env` (see [step 4](
 The one part that can still trip up is the **login page**, because every school's SSO is laid out differently. If `npm run auth` fails or times out:
 
 - **The login URL is different.** The tool expects to be redirected to `login.<your-domain>` (e.g. `canvas.xxx.edu` → `login.xxx.edu`). If your school's SSO lives somewhere else, set `CANVAS_LOGIN_HOST` in your `.env` to that host (e.g. `CANVAS_LOGIN_HOST=sso.xxx.edu`).
+- **Your school uses a country-code domain (e.g. `.ac.uk`, `.edu.au`, `.edu.cn`).** The default only strips the *first* label, so `canvas.uni.ac.uk` becomes `login.uni.ac.uk` — which is often not where the SSO actually lives. International logins frequently need this set by hand: do a normal manual login in your browser, note which host the password page loads on, and set `CANVAS_LOGIN_HOST` to it (e.g. `CANVAS_LOGIN_HOST=idp.uni.ac.uk`).
 - **Your login happens on the Canvas page itself (no redirect).** Some schools — including many on `*.instructure.com` — don't bounce you to a separate sign-on host; you type your password right on the Canvas domain. The default guess (`login.<your-domain>`) is then wrong and login will time out waiting for a redirect that never comes. Set `CANVAS_LOGIN_HOST` to the Canvas host itself (e.g. `CANVAS_LOGIN_HOST=myschool.instructure.com`).
 - **The username/password boxes are named differently.** The tool tries the common field names (`username`, `password`, and a submit button). If your school uses unusual field names, you'll need to edit the selectors in `auth.js` (the `page.fill(...)` lines in the `login` function). This is the one spot that may need a technical hand.
 

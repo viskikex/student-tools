@@ -100,6 +100,8 @@ setx SLIDES_DIR "$HOME\Documents\Obsidian Vault\school\slides"
 
 The `--out` flag always wins over `SLIDES_DIR` for a single run.
 
+> ⚠️ **One fallback to know about:** the `SLIDES_DIR` / `chNN.md` naming needs a chapter number, which the tool tries to detect from the filename. If it **can't** detect one **and** you didn't pass `--out`, it falls back to writing the `.md` **next to the input file** (e.g. straight into `~/Downloads`) — *not* into `SLIDES_DIR` — and prints a warning saying so. To keep output in `SLIDES_DIR`, pass `--chapter NN` (it'll write `chNN.md` there); or use `--out PATH` to place a single run anywhere.
+
 ---
 
 ## Fed automatically by canvas-grabber (optional)
