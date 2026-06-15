@@ -26,10 +26,11 @@ from pptx.enum.text import PP_ALIGN
 
 def _defang(text: str) -> str:
     """Neutralize Obsidian wikilinks/embeds (``[[note]]`` / ``![[note]]``) in
-    untrusted slide text by inserting a zero-width space after the first bracket.
-    Without this, a deck's text could pull other vault notes into the converted
-    output. Mirrors canvas-grabber's inline() defang."""
-    return text.replace("[[", "[​[")
+    untrusted slide text by inserting a zero-width space after each ``[`` that is
+    followed by another ``[``. A plain ``str.replace("[[", ...)`` is non-overlapping
+    and leaves a live ``[[`` behind on a run of 3+ brackets (``[[[`` -> ``[<zwsp>[[``);
+    the lookahead handles runs of any length. Mirrors canvas-grabber's inline() defang."""
+    return re.sub(r"\[(?=\[)", "[​", text)
 
 
 def _clean(text: str) -> str:

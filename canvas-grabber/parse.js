@@ -1,6 +1,9 @@
 import { readFile, readdir, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, resolve, sep } from 'path';
+// Markdown-safety + course-identity helpers live in md-util.js (the single copy,
+// shared with readings.js) so the `[[` defang can't drift between emitters.
+import { inline, cell, courseShortCode, cleanTitle, resolveFolder } from './md-util.js';
 
 const OUTPUT_DIR = process.env.OUTPUT_DIR ?? './output';
 // Where the Markdown goes. The output is always the per-course-hub layout (one
@@ -53,31 +56,6 @@ function cleanCourseName(code) {
     .trim();
 }
 
-// The bare course code with no spaces/section/term junk, e.g.
-// "PSYX362.50-50184-Summer Session 2026" -> "PSYX362". Used as the map key and
-// as a stable short label in hubs.
-function courseShortCode(code) {
-  return (code ?? '').replace(/[.\-].*$/, '').trim();
-}
-
-// Neutralize a raw Canvas string for inline placement in Markdown. Canvas
-// assignment/course titles are not trusted text: they can contain newlines (which
-// break headers/tables) and Obsidian wikilinks/embeds — `[[note]]` / `![[note]]`
-// activate even inside table cells and would pull other vault notes into the
-// output. A zero-width space after the first `[` defangs both without visibly
-// changing the title.
-function inline(s) {
-  return String(s ?? '')
-    .replace(/\r?\n+/g, ' ')
-    .replace(/\[\[/g, '[​[')
-    .trim();
-}
-
-// inline() plus pipe-escaping, for Markdown table cells.
-function cell(s) {
-  return inline(s).replace(/\|/g, '\\|');
-}
-
 // Discussion-board assignments submit as a `discussion_topic`. Canvas flips the
 // submission to "submitted" after the INITIAL post alone — it does not expose
 // how many peer replies are required (that lives only in the syllabus/rubric
@@ -110,12 +88,6 @@ function submissionStatus(a) {
     return isDiscussion(a) ? 'initial post in · replies not tracked' : 'submitted · awaiting grade';
   }
   return isDiscussion(a) ? 'not started' : 'not submitted';
-}
-
-// Strip section/term parentheticals from a course name:
-// "Multicultural Psychology (Sect: 50, 50184, ...)" -> "Multicultural Psychology"
-function cleanTitle(name) {
-  return String(name ?? '').replace(/\s*\(Sect:.*$/i, '').trim();
 }
 
 // An assignment is "outstanding" if it still needs the student's attention OR a
@@ -186,18 +158,6 @@ async function gatherCourses() {
 // the tool admits what it can't see instead of implying you're finished.
 const DISCUSSION_CAVEAT =
   'Discussion boards show only your **initial post** — Canvas doesn\'t expose peer-reply requirements, so check the syllabus for required responses.';
-
-function resolveFolder(course, map) {
-  // Exact short-code match wins outright. Otherwise treat keys as PREFIXES of the
-  // raw course code (anchored, not loose substrings) and try the longest key
-  // first, so a specific key like "PSYX362" beats a loose one like "PSY" instead
-  // of the result depending on JSON key order. Numeric keys match the course id.
-  if (map[course.shortCode]) return map[course.shortCode];
-  for (const key of Object.keys(map).sort((a, b) => b.length - a.length)) {
-    if (String(course.id) === String(key) || course.rawCode.startsWith(key)) return map[key];
-  }
-  return course.shortCode || course.slug;
-}
 
 function courseHubMarkdown(c) {
   // No frontmatter: Allie reads these, doesn't query them, and any frontmatter

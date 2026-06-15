@@ -32,7 +32,11 @@ from pathlib import Path
 # Allow running as a script from any cwd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from syllabus.dates import extract_dates, infer_year, render_table
+# defang() lives in dates.py (the single copy for this tool) — applied to the
+# converted body + the filename-stem heading below so a syllabus can't pull other
+# vault notes into the output. Safe on converter output, which never emits real
+# wikilinks.
+from syllabus.dates import defang, extract_dates, infer_year, render_table
 
 SYLLABUS_DIR = Path(os.environ.get("SYLLABUS_DIR") or Path.home() / "syllabi")
 
@@ -40,15 +44,6 @@ SYLLABUS_DIR = Path(os.environ.get("SYLLABUS_DIR") or Path.home() / "syllabi")
 def slugify(stem: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-")
     return slug or "syllabus"
-
-
-def _defang(text: str) -> str:
-    """Neutralize Obsidian wikilinks/embeds (``[[note]]`` / ``![[note]]``) in
-    untrusted syllabus text with a zero-width space after the first bracket, so a
-    syllabus can't pull other vault notes into the output. Mirrors canvas-grabber's
-    inline() defang. Safe to apply to converter output, which never emits real
-    wikilinks."""
-    return text.replace("[[", "[​[")
 
 
 def main() -> None:
@@ -103,7 +98,7 @@ def main() -> None:
         output_path = SYLLABUS_DIR / f"{slugify(input_path.stem)}.md"
 
     md = "\n".join([
-        f"# {_defang(input_path.stem)}",
+        f"# {defang(input_path.stem)}",
         "",
         f"> Converted from `{input_path.name}` on {date.today():%Y-%m-%d}. "
         f"The key dates below are auto-extracted (assumed year: {year}) — "
@@ -115,7 +110,7 @@ def main() -> None:
         "",
         "---",
         "",
-        _defang(body),
+        defang(body),
     ])
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

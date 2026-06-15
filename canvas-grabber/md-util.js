@@ -1,7 +1,7 @@
-// Shared Markdown-safety + course-identity helpers, used by both parse.js and
-// readings.js. These mirror the originals that live in parse.js; keeping a single
-// copy here means the `[[`/`![[` injection defang and pipe-escaping (a security
-// boundary — see CLAUDE.md "Guardrails") can't drift between the two emitters.
+// Shared Markdown-safety + course-identity helpers. This is the SINGLE copy of
+// the `[[`/`![[` injection defang and pipe-escaping (a security boundary — see
+// CLAUDE.md "Guardrails"); parse.js and readings.js both import from here so the
+// logic can't drift between the two emitters.
 //
 // All functions are pure (no env, no I/O) so they're safe to import anywhere
 // without side effects.
@@ -11,10 +11,16 @@
 // Obsidian wikilinks/embeds — `[[note]]` / `![[note]]` activate even inside table
 // cells and would pull other vault notes into the output. A zero-width space after
 // the first `[` defangs both without visibly changing the title.
+//
+// The lookahead (rather than matching a literal `[[`) is load-bearing: a plain
+// non-overlapping `replace(/\[\[/g, …)` leaves a live pair behind on a run of
+// three or more brackets, because after consuming the first pair the scan can't
+// re-pair the leftover bracket with the next one. Inserting a ZWSP after EVERY
+// `[` that is immediately followed by another `[` neutralizes runs of any length.
 export function inline(s) {
   return String(s ?? '')
     .replace(/\r?\n+/g, ' ')
-    .replace(/\[\[/g, '[​[')
+    .replace(/\[(?=\[)/g, '[​')
     .trim();
 }
 

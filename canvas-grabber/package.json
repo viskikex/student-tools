@@ -20,6 +20,7 @@
     "parse": "node --env-file-if-exists=.env parse.js",
     "readings": "node --env-file-if-exists=.env readings.js",
     "convert-slides": "bash convert-canvas-slides.sh",
+    "test": "node --test",
     "sync": "node --env-file-if-exists=.env auth.js && node --env-file-if-exists=.env grab.js && node --env-file-if-exists=.env parse.js && node --env-file-if-exists=.env readings.js && bash convert-canvas-slides.sh"
   },
   "dependencies": {

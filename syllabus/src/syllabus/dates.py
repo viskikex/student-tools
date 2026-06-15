@@ -43,14 +43,24 @@ def infer_year(text: str) -> int | None:
     return None
 
 
+def defang(text: str) -> str:
+    """Neutralize Obsidian wikilinks/embeds (``[[note]]`` / ``![[note]]``) by
+    inserting a zero-width space after each ``[`` that is followed by another ``[``.
+    A plain ``str.replace("[[", ...)`` is non-overlapping and leaves a live ``[[``
+    behind on a run of 3+ brackets; the lookahead handles runs of any length.
+    Shared with convert.py so the syllabus tool keeps one copy of the defang.
+    Mirrors canvas-grabber's inline() defang."""
+    return re.sub(r"\[(?=\[)", "[​", text)
+
+
 def _clean_context(line: str) -> str:
     text = re.sub(r"\s+", " ", line).strip(" #|->*•\t").strip()
     if len(text) > 110:
         text = text[:107].rstrip() + "…"
     # Contexts land in a markdown table: keep pipes from breaking it, and defang
-    # Obsidian wikilinks/embeds ([[note]] / ![[note]]) with a zero-width space
-    # after the first bracket so a syllabus line can't pull in other vault notes.
-    return text.replace("[[", "[​[").replace("|", "\\|")
+    # Obsidian wikilinks/embeds ([[note]] / ![[note]]) so a syllabus line can't
+    # pull in other vault notes.
+    return defang(text).replace("|", "\\|")
 
 
 def _safe_date(year: int, month: int, day: int) -> date | None:
