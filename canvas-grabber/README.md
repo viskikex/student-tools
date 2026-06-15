@@ -18,6 +18,7 @@ The tool writes clean Markdown designed to drop into an [Obsidian](https://obsid
 | File | What's in it |
 |------|--------------|
 | `<course>/canvas.md` | A per-course hub: a one-line grade header, an **Outstanding** table (anything not yet graded), and an **All assignments** table of every assignment with your score. |
+| `<course>/canvas-readings.md` | A per-course **week view** built from the course's modules: each module's readings (PDFs, slide decks, links, …) classified by kind, with the current week flagged. Files can optionally be downloaded into the vault. See [Readings & a per-course week view](#readings--a-per-course-week-view). |
 | `_upcoming.md` | A vault-wide table of everything outstanding across **all** your courses, soonest-first (overdue items flagged with ⚠️). |
 | `_grades.md` | A vault-wide grade-per-course table. |
 
@@ -31,13 +32,14 @@ It also dumps the raw data it pulled from Canvas into `output/` as JSON (courses
 
 ## How it works (the 30-second version)
 
-The tool runs in three steps:
+The tool runs in these steps:
 
 1. **Auth** — Opens a real browser window and logs you into Canvas through your university's single sign-on (SSO) page using the username and password in your `.env` file. It saves the session to `.auth-state.json` so it doesn't have to log in every single time.
 2. **Grab** — Calls Canvas's official API and saves everything about your courses as JSON files in `output/`.
 3. **Parse** — Reads those JSON files and writes the friendly Markdown (a per-course `canvas.md` hub plus the `_upcoming.md` / `_grades.md` dashboards).
+4. **Readings** — Builds each course's `canvas-readings.md` week view from its modules. By default this just indexes (no login, no downloads); set `DOWNLOAD_READINGS=1` to also pull the files, and any `.pptx` decks are then handed to the [`slides/`](../slides) tool for conversion to Markdown. See [Readings & a per-course week view](#readings--a-per-course-week-view).
 
-The `npm run sync` command does all three in a row.
+The `npm run sync` command does all of this in a row.
 
 It logs in as **you**, using **your own** credentials, and only fetches data your account can already see in the Canvas web app. Note that "data your account can see" includes some things about **other people** — e.g. class rosters with classmates' names. See [Security & privacy](#security--privacy).
 

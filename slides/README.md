@@ -102,6 +102,12 @@ The `--out` flag always wins over `SLIDES_DIR` for a single run.
 
 ---
 
+## Fed automatically by canvas-grabber (optional)
+
+If you also use the sibling [`canvas-grabber`](../canvas-grabber) tool, it can download your course slide decks straight from Canvas and run them through this converter for you — landing `chNN.md` in your vault without converting each deck by hand. It even reads spelled-out chapters ("Chapter Ten") that this tool's own filename detection can't, and passes them in via `--chapter`. See canvas-grabber's README, *Readings & a per-course week view*. This tool still works completely standalone; that's just a convenience wiring.
+
+---
+
 ## Project layout
 
 ```
