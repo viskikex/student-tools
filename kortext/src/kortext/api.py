@@ -120,7 +120,19 @@ class KortextClient:
                     f"token endpoint returned {resp.status}; "
                     f"saved auth state may be expired — re-run auth.py"
                 )
-            self._token = resp.text().strip().strip('"')
+            token = resp.text().strip().strip('"')
+            # A stale session often returns 200 with an empty body or an HTML
+            # login page rather than a clean 401. Putting that into an
+            # Authorization header throws a cryptic "Invalid character in header
+            # content" downstream, so catch it here and give the actionable
+            # message the README/troubleshooting promises.
+            if token.count(".") != 2 or not all(token.split(".")):
+                raise RuntimeError(
+                    "token endpoint returned 200 but not a valid JWT "
+                    "(likely an HTML login page) — saved auth state is expired, "
+                    "re-run auth.py / kortext-auth"
+                )
+            self._token = token
             try:
                 payload = decode_jwt_payload(self._token)
                 self._token_exp = payload.get("exp")
