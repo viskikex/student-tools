@@ -48,8 +48,12 @@ def defang(text: str) -> str:
     inserting a zero-width space after each ``[`` that is followed by another ``[``.
     A plain ``str.replace("[[", ...)`` is non-overlapping and leaves a live ``[[``
     behind on a run of 3+ brackets; the lookahead handles runs of any length.
+    We also break Markdown image syntax ``![](url)`` (a ZWSP after ``!`` when it
+    precedes ``[``): Obsidian auto-loads remote images, so an image in untrusted
+    syllabus text is a tracking beacon; the ZWSP downgrades it to a plain text link.
     Shared with convert.py so the syllabus tool keeps one copy of the defang.
     Mirrors canvas-grabber's inline() defang."""
+    text = re.sub(r"!(?=\[)", "!​", text)
     return re.sub(r"\[(?=\[)", "[​", text)
 
 

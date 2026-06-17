@@ -4,7 +4,9 @@
 // logic can't drift between the two emitters.
 //
 // All functions are pure (no env, no I/O) so they're safe to import anywhere
-// without side effects.
+// without side effects. (The `sep` import is just `path.sep`, a constant.)
+
+import { sep } from 'path';
 
 // Neutralize a raw Canvas string for inline placement in Markdown. Canvas titles
 // are untrusted: they can contain newlines (which break headers/tables) and
@@ -17,9 +19,16 @@
 // three or more brackets, because after consuming the first pair the scan can't
 // re-pair the leftover bracket with the next one. Inserting a ZWSP after EVERY
 // `[` that is immediately followed by another `[` neutralizes runs of any length.
+//
+// We also break Markdown image syntax `![](url)`: Obsidian's reading view
+// auto-loads remote images, so a `![](https://attacker/x.png)` in a Canvas title
+// is a silent tracking beacon. A ZWSP after the `!` (when it precedes a `[`)
+// downgrades the image to a plain text link — no network fetch on render. (The
+// `[[`-embed form `![[note]]` is already covered by the bracket rule above.)
 export function inline(s) {
   return String(s ?? '')
     .replace(/\r?\n+/g, ' ')
+    .replace(/!(?=\[)/g, '!​')
     .replace(/\[(?=\[)/g, '[​')
     .trim();
 }
@@ -39,6 +48,22 @@ export function courseShortCode(code) {
 // "Multicultural Psychology (Sect: 50, 50184, ...)" -> "Multicultural Psychology"
 export function cleanTitle(name) {
   return String(name ?? '').replace(/\s*\(Sect:.*$/i, '').trim();
+}
+
+// True if `dir` is `root` itself or sits inside it — i.e. it has NOT escaped via
+// "../". The containment guard for hand-edited vault-map folder values; shared by
+// parse.js and readings.js so the security check can't drift between them.
+export function isInside(dir, root) {
+  return dir === root || dir.startsWith(root + sep);
+}
+
+// Format a Date as a short "Tue, Jun 16, 5:54 PM"-style stamp in the given IANA
+// timezone. The tz is passed in (not read from env) to keep this module pure.
+export function stamp(d, tz) {
+  return d.toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZone: tz,
+  });
 }
 
 // Pick the TARGET_DIR sub-folder a course's output lands in, from a vault-map.

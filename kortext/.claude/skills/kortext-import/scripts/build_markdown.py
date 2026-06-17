@@ -39,7 +39,18 @@ def slugify(s: str) -> str:
 
 
 def safe_filename(href: str) -> str:
-    return href.replace("/", "__")
+    """Map an OEBPS href to a safe local filename.
+
+    The href comes from package.opf, so it's untrusted (a hostile/MITM'd manifest
+    could carry `..` or backslashes to escape raw/). Replace path separators, strip
+    control chars, and collapse `..` — mirrors canvas-grabber's safeName(). Output
+    is unchanged for legit Springer hrefs, so existing corpus files still resolve.
+    scrape.py keeps an identical copy; keep the two in sync."""
+    name = re.sub(r"[\\/]+", "__", href)   # path separators -> __
+    name = re.sub(r"[\x00-\x1f]", "", name)  # strip control chars
+    name = re.sub(r"\.{2,}", ".", name)    # collapse .. so it can't traverse
+    name = name.strip().lstrip(".")
+    return name or "file"
 
 
 def _to_roman(n: int) -> str:

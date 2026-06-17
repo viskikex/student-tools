@@ -46,9 +46,15 @@ async function login(netid, password, storageState) {
   const browser = await browserType.launch({ headless: false });
   const context = await browser.newContext({ storageState });
   const page = await context.newPage();
+  // Anchor the SSO host match to the start of the URL and require LOGIN_HOST to
+  // be the WHOLE host (terminated by port/path/query/fragment or end). An
+  // unanchored, dots-only-escaped regex would also match a look-alike like
+  // login.school.edu.attacker.com — into which we'd then type the password.
+  const escapedHost = LOGIN_HOST.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const loginHostRe = new RegExp(`^https?://${escapedHost}(?:[:/?#]|$)`);
   try {
     await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-    await page.waitForURL(new RegExp(LOGIN_HOST.replace(/\./g, '\\.')), { timeout: 30_000 });
+    await page.waitForURL(loginHostRe, { timeout: 30_000 });
     await page.fill('input[name="username"], input[id="username"], input[name="j_username"]', netid);
     await page.fill('input[name="password"], input[id="password"], input[name="j_password"]', password);
     await page.click('input[type="submit"], button[type="submit"]');

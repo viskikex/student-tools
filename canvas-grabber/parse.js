@@ -1,9 +1,10 @@
 import { readFile, readdir, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, resolve, sep } from 'path';
+import { join, resolve } from 'path';
 // Markdown-safety + course-identity helpers live in md-util.js (the single copy,
-// shared with readings.js) so the `[[` defang can't drift between emitters.
-import { inline, cell, courseShortCode, cleanTitle, resolveFolder } from './md-util.js';
+// shared with readings.js) so the `[[` defang and containment guard can't drift
+// between emitters.
+import { inline, cell, courseShortCode, cleanTitle, resolveFolder, isInside, stamp } from './md-util.js';
 
 const OUTPUT_DIR = process.env.OUTPUT_DIR ?? './output';
 // Where the Markdown goes. The output is always the per-course-hub layout (one
@@ -25,25 +26,23 @@ async function readJSON(path) {
   }
 }
 
-// toLocaleString (not toLocaleDateString) is the date+time API — the hour/minute
-// options below are only honored there. Guard Invalid Date so a malformed due_at
-// renders as '—' instead of the literal string "Invalid Date".
+// Guard Invalid Date so a malformed due_at renders as '—' instead of the literal
+// string "Invalid Date"; otherwise defer to the shared stamp() formatter.
 function formatDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit', timeZone: TZ
-  });
+  return stamp(d, TZ);
 }
 
-function humanStamp(d = new Date()) {
-  return d.toLocaleString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit', timeZone: TZ
-  });
-}
+// Comparator for assignments by due date: undated sort last, then ascending
+// (soonest first) or descending. Used for the outstanding list and the full
+// gradebook, which want opposite directions.
+const byDueDate = (asc) => (a, b) => {
+  if (!a.due_at) return 1;
+  if (!b.due_at) return -1;
+  return asc ? new Date(a.due_at) - new Date(b.due_at) : new Date(b.due_at) - new Date(a.due_at);
+};
 
 function cleanCourseName(code) {
   return String(code ?? '')               // guard null/non-string, as courseShortCode/inline/cleanTitle do
@@ -168,15 +167,11 @@ function courseHubMarkdown(c) {
     : 'no grade yet';
   const termStr = c.term ? ` · ${inline(c.term)}` : '';
 
-  const outstanding = c.assignments.filter(isOutstanding).sort((a, b) => {
-    if (!a.due_at) return 1;
-    if (!b.due_at) return -1;
-    return new Date(a.due_at) - new Date(b.due_at);
-  });
+  const outstanding = c.assignments.filter(isOutstanding).sort(byDueDate(true));
 
   const lines = [
     `# ${inline(c.shortCode)} · ${inline(c.name)}`,
-    `**Grade: ${gradeStr}**${termStr} · _synced ${humanStamp()}_`, '',
+    `**Grade: ${gradeStr}**${termStr} · _synced ${stamp(new Date(), TZ)}_`, '',
     '## Outstanding', '',
   ];
 
@@ -195,11 +190,7 @@ function courseHubMarkdown(c) {
   }
 
   // Full gradebook, most-recent due first (undated last).
-  const all = [...c.assignments].sort((a, b) => {
-    if (!a.due_at) return 1;
-    if (!b.due_at) return -1;
-    return new Date(b.due_at) - new Date(a.due_at);
-  });
+  const all = [...c.assignments].sort(byDueDate(false));
 
   lines.push(
     '## All assignments', '',
@@ -230,7 +221,7 @@ async function writeOutput(courses) {
     const dir = resolve(join(TARGET_DIR, folder));
     // Guard against a vault-map value (or odd course code) escaping TARGET_DIR
     // via "../". The data is the user's own, but map values are hand-edited.
-    if (dir !== root && !dir.startsWith(root + sep)) {
+    if (!isInside(dir, root)) {
       console.warn(`  skipping ${c.shortCode}: folder "${folder}" resolves outside TARGET_DIR`);
       continue;
     }
@@ -263,7 +254,7 @@ async function writeOutput(courses) {
   });
 
   const upcomingMd = [
-    '# Upcoming & Outstanding', `_Synced ${humanStamp()}_`, '',
+    '# Upcoming & Outstanding', `_Synced ${stamp(new Date(), TZ)}_`, '',
     '| Due | Course | Assignment | Points | Status |',
     '|-----|--------|------------|--------|--------|',
     ...allOutstanding.map(r => {
@@ -279,7 +270,7 @@ async function writeOutput(courses) {
   console.log(`wrote ${join(TARGET_DIR, '_upcoming.md')} (${allOutstanding.length} outstanding)`);
 
   const gradesMd = [
-    '# Grades', `_Synced ${humanStamp()}_`, '',
+    '# Grades', `_Synced ${stamp(new Date(), TZ)}_`, '',
     '| Course | Score | Grade |',
     '|--------|-------|-------|',
     ...courses.map(c =>

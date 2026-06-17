@@ -32,6 +32,28 @@ test('cell() leaves no live [[ and escapes pipes', () => {
   assert.equal(cell('a|b|c'), 'a\\|b\\|c');
 });
 
+// Markdown images auto-load remote URLs in Obsidian's reading view, so an
+// untrusted `![](url)` is a tracking beacon. The defang must break the `![`
+// trigger; a plain `[text](url)` link (no auto-fetch) is acceptable to leave.
+const imagePayloads = [
+  '![](https://attacker.example/track.png)',
+  '![alt](https://attacker.example/track.png)',
+  '![[embed]]',
+];
+
+test('inline()/cell() leave no live image trigger ![', () => {
+  for (const p of imagePayloads) {
+    assert.ok(!inline(p).includes('!['), `live ![ survived inline(${JSON.stringify(p)})`);
+    assert.ok(!cell(p).includes('!['), `live ![ survived cell(${JSON.stringify(p)})`);
+  }
+});
+
+test('inline() leaves a bare ! and a plain [link] untouched', () => {
+  assert.equal(inline('hello!'), 'hello!');
+  assert.equal(inline('wow! great'), 'wow! great');
+  assert.equal(inline('![x]'), '!​[x]'); // ! before [ is broken with a ZWSP
+});
+
 test('inline() collapses newlines and leaves clean text untouched', () => {
   assert.equal(inline('line1\nline2'), 'line1 line2');
   assert.equal(inline('  hi  '), 'hi');
@@ -40,7 +62,7 @@ test('inline() collapses newlines and leaves clean text untouched', () => {
 });
 
 test('inline() defang is idempotent', () => {
-  for (const p of wikilinkPayloads) {
+  for (const p of [...wikilinkPayloads, ...imagePayloads]) {
     const once = inline(p);
     assert.equal(inline(once), once);
   }

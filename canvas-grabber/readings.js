@@ -21,9 +21,9 @@
 
 import { mkdir, writeFile, readFile, readdir } from 'fs/promises';
 import { existsSync, statSync } from 'fs';
-import { join, resolve, sep, extname } from 'path';
+import { join, resolve, extname, basename } from 'path';
 import { fetchOne, downloadFile, dispose } from './client.js';
-import { inline, cell, courseShortCode, cleanTitle, resolveFolder } from './md-util.js';
+import { inline, cell, courseShortCode, cleanTitle, resolveFolder, isInside, stamp } from './md-util.js';
 
 const OUTPUT_DIR = process.env.OUTPUT_DIR ?? './output';
 const TARGET_DIR = process.env.VAULT_DIR ?? process.env.SUMMARY_DIR ?? OUTPUT_DIR;
@@ -56,13 +56,6 @@ const summary = { downloaded: 0, present: 0, tooBig: 0, skippedType: 0, locked: 
 
 async function readJSON(path) {
   try { return JSON.parse(await readFile(path, 'utf8')); } catch { return null; }
-}
-
-function humanStamp(d) {
-  return d.toLocaleString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit', timeZone: TZ,
-  });
 }
 
 // ---- classification (rule-based, no LLM) ----
@@ -206,7 +199,7 @@ function dedupeSlidePath(p) {
   while (usedSlidePaths.has(`${base}-${i}${ext}`)) i++;
   const np = `${base}-${i}${ext}`;
   usedSlidePaths.add(np);
-  console.warn(`    ⚠ two decks map to ${basenameNoDir(p)} — writing ${basenameNoDir(np)} instead`);
+  console.warn(`    ⚠ two decks map to ${basename(p)} — writing ${basename(np)} instead`);
   return np;
 }
 
@@ -340,8 +333,8 @@ async function downloadCourse(c, folder) {
 
 function sourceCell(it) {
   // Basenames are safeName()'d (no [ ] | ), so the wikilink can't be forged.
-  if (it._md) return `[[${basenameNoDir(it._md)}]]`;       // converted slide markdown
-  if (it._local) return `[[${basenameNoDir(it._local)}]]`; // downloaded file
+  if (it._md) return `[[${basename(it._md)}]]`;       // converted slide markdown
+  if (it._local) return `[[${basename(it._local)}]]`; // downloaded file
   if (it.type === 'ExternalUrl' && it.external_url) return urlSource('link', it.external_url);
   if (it.html_url) return urlSource('Canvas', it.html_url);
   return '—';
@@ -356,14 +349,10 @@ function urlSource(label, url) {
   return `[${label}](<${u}>)`;
 }
 
-function basenameNoDir(p) {
-  return p.split(/[\/\\]/).pop();
-}
-
 async function writeReadingsMd(c, folder, now) {
   const lines = [
     `# ${inline(c.shortCode)} · ${inline(c.name)} — Readings`,
-    `_synced ${humanStamp(now)}_`, '',
+    `_synced ${stamp(now, TZ)}_`, '',
   ];
   for (const m of c.modules) {
     const shown = m.items.filter(it => SHOWN.has(it.kind));
@@ -381,7 +370,7 @@ async function writeReadingsMd(c, folder, now) {
   }
   const dir = resolve(join(TARGET_DIR, folder));
   const root = resolve(TARGET_DIR);
-  if (dir !== root && !dir.startsWith(root + sep)) {
+  if (!isInside(dir, root)) {
     console.warn(`  skipping ${c.shortCode}: folder "${folder}" resolves outside TARGET_DIR`);
     return;
   }
@@ -407,7 +396,7 @@ async function main() {
     // can't make the DOWNLOAD step write outside TARGET_DIR. writeReadingsMd checks
     // this too, but downloads run first.
     const dir = resolve(join(TARGET_DIR, folder));
-    if (dir !== root && !dir.startsWith(root + sep)) {
+    if (!isInside(dir, root)) {
       console.warn(`  skipping ${c.shortCode}: folder "${folder}" resolves outside TARGET_DIR`);
       continue;
     }

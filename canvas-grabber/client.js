@@ -56,6 +56,23 @@ export async function fetchOne(path) {
 export async function downloadFile(url, destPath, { maxBytes = Infinity } = {}) {
   const r = await req();
   const full = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+
+  // Pre-flight HEAD: reject oversize BEFORE the GET buffers the whole body into
+  // memory. res.body() below has no streaming cap, so without this a file whose
+  // real size exceeds the cap — a lying `size` in the Canvas file API, or a
+  // redirect to something huge — would OOM the process before maxBytes is checked.
+  // HEAD may 405 on some signed URLs; if so we fall through to the GET + post-body
+  // backstop rather than failing the download. (Residual: a server that
+  // under-reports here but streams more on GET can still over-buffer — closing
+  // that fully would mean leaving Playwright's request API.)
+  if (maxBytes !== Infinity) {
+    const head = await r.head(full).catch(() => null);
+    const len = head ? Number(head.headers()['content-length']) : NaN;
+    if (Number.isFinite(len) && len > maxBytes) {
+      throw new Error(`content-length ${(len / 1048576).toFixed(1)}MB exceeds per-file cap`);
+    }
+  }
+
   const res = await r.get(full);
   if (!res.ok()) throw new Error(`${res.status()} ${res.statusText()} — ${full}`);
   const ctype = (res.headers()['content-type'] ?? '').toLowerCase();

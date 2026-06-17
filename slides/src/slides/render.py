@@ -29,22 +29,17 @@ def _defang(text: str) -> str:
     untrusted slide text by inserting a zero-width space after each ``[`` that is
     followed by another ``[``. A plain ``str.replace("[[", ...)`` is non-overlapping
     and leaves a live ``[[`` behind on a run of 3+ brackets (``[[[`` -> ``[<zwsp>[[``);
-    the lookahead handles runs of any length. Mirrors canvas-grabber's inline() defang."""
+    the lookahead handles runs of any length. We also break Markdown image syntax
+    ``![](url)`` (a ZWSP after ``!`` when it precedes ``[``): Obsidian auto-loads
+    remote images, so an image in untrusted slide text is a tracking beacon; the
+    ZWSP downgrades it to a plain text link. Mirrors canvas-grabber's inline() defang."""
+    text = re.sub(r"!(?=\[)", "!​", text)
     return re.sub(r"\[(?=\[)", "[​", text)
 
 
 def _clean(text: str) -> str:
     """Normalize whitespace, strip control chars, and defang wikilinks."""
     return _defang(re.sub(r"[ \t]+", " ", text).strip())
-
-
-def _para_to_bullets(para, indent: int = 0) -> str | None:
-    """Convert a pptx paragraph to a markdown bullet string, or None if empty."""
-    text = _clean(para.text)
-    if not text:
-        return None
-    prefix = "  " * indent + "- "
-    return prefix + text
 
 
 def _shape_text_lines(shape) -> list[str]:

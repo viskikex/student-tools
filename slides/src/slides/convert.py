@@ -65,8 +65,7 @@ def detect_chapter(stem: str) -> str | None:
 def resolve_chapter(explicit: str | None, input_path: Path) -> str | None:
     if explicit:
         return explicit.zfill(2)
-    detected = detect_chapter(input_path.stem)
-    return detected
+    return detect_chapter(input_path.stem)
 
 
 def main() -> None:
