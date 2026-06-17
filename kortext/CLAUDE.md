@@ -22,6 +22,7 @@ chapter XHTML                       →  parse with BeautifulSoup  →  markdown
 Files:
 - `src/kortext/api.py` — `KortextClient` (token + manifest + chapter fetch)
 - `src/kortext/render.py` — Springer XHTML → Obsidian-flavored markdown
+- `src/kortext/cli.py` — thin console entrypoints (`kortext-auth/discover/scrape/build`, registered in `pyproject.toml`) that load and run the skill scripts below. Keeps the manual user-facing path off the hidden `.claude/skills/...` path.
 - `.claude/skills/kortext-import/scripts/auth.py` — one-time login
 - `.claude/skills/kortext-import/scripts/discover.py` — list the user's library
 - `.claude/skills/kortext-import/scripts/scrape.py` — fetch manifest + chapter XHTMLs into `corpus/<slug>/raw/`
@@ -51,20 +52,20 @@ Both at `.claude/skills/<name>/SKILL.md`.
 
 ## Pipeline (canonical commands)
 
+Console entrypoints (after `pip install -e .`); each wraps the like-named `scripts/*.py`:
+
 ```bash
 # one-time: log in to Kortext, save cookies
-.venv/bin/python .claude/skills/kortext-import/scripts/auth.py
+.venv/bin/kortext-auth
 
 # (optional) list books in your library
-.venv/bin/python .claude/skills/kortext-import/scripts/discover.py
+.venv/bin/kortext-discover
 
 # fetch the whole book (skips already-downloaded)
-.venv/bin/python .claude/skills/kortext-import/scripts/scrape.py \
-    --book-id <BOOK_ID> --slug <slug>
+.venv/bin/kortext-scrape --book-id <BOOK_ID> --slug <slug>
 
 # build markdown from raw XHTMLs
-.venv/bin/python .claude/skills/kortext-import/scripts/build_markdown.py \
-    --slug <slug>
+.venv/bin/kortext-build --slug <slug>
 
 # then point CC at corpus/<slug>/ and ask
 # "summarize chapter 1" → triggers textbook-summarize

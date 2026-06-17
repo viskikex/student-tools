@@ -7,6 +7,8 @@ description: Use when the user wants to import, scrape, download, or extract a K
 
 End-to-end pipeline for getting a Kortext book into the local markdown corpus. Each stage is idempotent so re-running is safe.
 
+Each stage has a console entrypoint (`kortext-auth`, `kortext-discover`, `kortext-scrape`, `kortext-build`) registered by `pip install -e .` — these are thin wrappers (`src/kortext/cli.py`) over the `scripts/*.py` files shown below. Prefer the entrypoints; fall back to `.venv/bin/python scripts/<name>.py` only if the package isn't installed editable.
+
 ## Architecture (one-line version)
 
 Kortext serves Springer EPUB3 chapters as XHTML through a REST API. We mint a JWT from `/account/token` using saved session cookies, then fetch every chapter and build markdown locally. ~17 GET requests per book.
@@ -20,7 +22,7 @@ Run when:
 - `scrape.py` fails with an "Unauthorized" / "401" / "token endpoint returned" error (cookies went stale).
 
 ```bash
-.venv/bin/python .claude/skills/kortext-import/scripts/auth.py
+.venv/bin/kortext-auth
 ```
 
 Opens headed Chromium. User logs in manually. When they press Enter, the script saves `storageState` to `auth-state.json` and closes the browser.
@@ -30,7 +32,7 @@ Opens headed Chromium. User logs in manually. When they press Enter, the script 
 Optional. Useful for finding a new book's content id.
 
 ```bash
-.venv/bin/python .claude/skills/kortext-import/scripts/discover.py
+.venv/bin/kortext-discover
 ```
 
 Once you have a `book_id`, pick a `slug` for it (kebab-case, e.g. `multicultural-psych`, `social-work-200`). The slug becomes the corpus directory name.
@@ -38,8 +40,7 @@ Once you have a `book_id`, pick a `slug` for it (kebab-case, e.g. `multicultural
 ### 3. `scripts/scrape.py` — fetch manifest + chapter XHTMLs
 
 ```bash
-.venv/bin/python .claude/skills/kortext-import/scripts/scrape.py \
-    --book-id <BOOK_ID> --slug <slug>
+.venv/bin/kortext-scrape --book-id <BOOK_ID> --slug <slug>
 ```
 
 What it does:
@@ -57,8 +58,7 @@ If a chapter fails partway through (network blip), just re-run — already-prese
 ### 4. `scripts/build_markdown.py` — XHTML → markdown corpus
 
 ```bash
-.venv/bin/python .claude/skills/kortext-import/scripts/build_markdown.py \
-    --slug multicultural-psych
+.venv/bin/kortext-build --slug multicultural-psych
 ```
 
 What it does:

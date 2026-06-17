@@ -8,6 +8,12 @@ dependencies = [
     "beautifulsoup4>=4.12",
 ]
 
+[project.scripts]
+kortext-auth = "src.kortext.cli:auth"
+kortext-discover = "src.kortext.cli:discover"
+kortext-scrape = "src.kortext.cli:scrape"
+kortext-build = "src.kortext.cli:build"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
