@@ -24,6 +24,11 @@ KORTEXT_URL = "https://app.kortext.com/"
 
 
 def main() -> int:
+    if not sys.stdin.isatty():
+        print("kortext-auth needs an interactive terminal (it waits for you to "
+              "log in, then press Enter). Run it directly in a terminal window, "
+              "not through a pipe or a non-interactive runner.", file=sys.stderr)
+        return 1
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         context = browser.new_context(viewport={"width": 1400, "height": 900})
