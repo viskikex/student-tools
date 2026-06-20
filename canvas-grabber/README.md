@@ -186,6 +186,16 @@ every item classified by kind (📖 reading, 🖥️ slides, 📋 syllabus, ✅ 
 🔗 link…). When a module name contains a parseable date range, the current week is
 flagged `📍 this week`.
 
+Each row also gets a **Chapter** column. When an item's title names a chapter —
+digits *or* spelled-out (`Chp1`, `Chapter Ten Quiz`) — the column emits two Obsidian
+wikilinks: `[[chNN]]` pointing at the [`slides/`](../slides) tool's converted
+`chNN.md`, and `[[chNN-notes]]` pointing at the [`kortext/`](../kortext) chapter study
+notes (which alias themselves `chNN-notes`). This is how the three tools join inside a
+shared vault — on a plain `chNN` naming convention, not a shared config file. Nothing
+reads anything else's output, so a link to a tool you don't use just renders dim
+(unresolved), never an error; it lights up if you later run that tool. Rows that name
+no chapter show `—`.
+
 By itself this just **indexes** — no files are downloaded and no login is needed. To
 also pull the files down into your vault, opt in with `DOWNLOAD_READINGS=1`:
 

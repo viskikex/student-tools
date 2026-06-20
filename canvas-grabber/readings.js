@@ -23,7 +23,7 @@ import { mkdir, writeFile, readFile, readdir } from 'fs/promises';
 import { existsSync, statSync } from 'fs';
 import { join, resolve, extname, basename } from 'path';
 import { fetchOne, downloadFile, dispose } from './client.js';
-import { inline, cell, courseShortCode, cleanTitle, resolveFolder, isInside, stamp } from './md-util.js';
+import { inline, cell, courseShortCode, cleanTitle, resolveFolder, isInside, stamp, chapterRef } from './md-util.js';
 
 const OUTPUT_DIR = process.env.OUTPUT_DIR ?? './output';
 const TARGET_DIR = process.env.VAULT_DIR ?? process.env.SUMMARY_DIR ?? OUTPUT_DIR;
@@ -137,23 +137,17 @@ function isCurrentWeek(name, now) {
 
 // ---- slide chapter detection (mirrors slides/ tool + handles spelled-out numbers) ----
 
-const NUMWORDS = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
-  eighteen: 18, nineteen: 19, twenty: 20,
-};
-
+// Like chapterRef (the chapter-only join key, in md-util) but broader: for naming a
+// deck's chNN.md we'll also accept a pp/week/module/unit/lecture number when the title
+// carries no explicit chapter. The chapter forms (incl. spelled-out "Ten") come from
+// chapterRef so the digit/word parsing lives in exactly one place.
 function chapterTag(name) {
+  const direct = chapterRef(name);
+  if (direct) return direct;
   const s = (name ?? '').toLowerCase();
-  // \b-anchor the "ch" forms so they don't latch onto the "ch" buried in unrelated
-  // words: "March 3" -> ch03, "Research 7" -> ch07 without it.
-  let m = s.match(/\bch(?:p|ap(?:ter)?)?[\s_-]*(\d{1,2})/)
-    || s.match(/\bpp[\s_-]*(\d{1,2})/)
+  const m = s.match(/\bpp[\s_-]*(\d{1,2})/)
     || s.match(/\b(?:week|wk|module|mod|unit|lec(?:ture)?)[\s_-]*(\d{1,2})/);
-  if (m) return String(Number(m[1])).padStart(2, '0');
-  m = s.match(/\bch(?:apter)?[\s_-]*([a-z]+)/);
-  if (m && NUMWORDS[m[1]]) return String(NUMWORDS[m[1]]).padStart(2, '0');
-  return null;
+  return m ? String(Number(m[1])).padStart(2, '0') : null;
 }
 
 // ---- path helpers ----
@@ -349,6 +343,18 @@ function urlSource(label, url) {
   return `[${label}](<${u}>)`;
 }
 
+// Cross-tool join. When a row names a chapter, emit wikilinks to the sibling tools'
+// chapter artifacts: [[chNN]] -> the slides tool's chNN.md, [[chNN-notes]] -> the
+// kortext chapter notes (which self-alias chNN-notes in their frontmatter). Both are
+// plain naming conventions — canvas-grabber never reads those tools' output, so a link
+// just stays unresolved (dim in Obsidian, never an error) until that tool runs. The
+// NN comes from our own padStart, so these are digits-only and safe to emit live
+// (unlike Canvas-supplied strings, which route through cell()/inline()).
+function chapterCell(it) {
+  const n = chapterRef(it.title);
+  return n ? `[[ch${n}]] · [[ch${n}-notes]]` : '—';
+}
+
 async function writeReadingsMd(c, folder, now) {
   const lines = [
     `# ${inline(c.shortCode)} · ${inline(c.name)} — Readings`,
@@ -363,9 +369,9 @@ async function writeReadingsMd(c, folder, now) {
       continue;
     }
     lines.push(
-      '| Kind | Item | Source |',
-      '|------|------|--------|',
-      ...shown.map(it => `| ${KIND_ICON[it.kind] ?? '•'} ${it.kind} | ${cell(it.title)} | ${sourceCell(it)} |`),
+      '| Kind | Item | Source | Chapter |',
+      '|------|------|--------|---------|',
+      ...shown.map(it => `| ${KIND_ICON[it.kind] ?? '•'} ${it.kind} | ${cell(it.title)} | ${sourceCell(it)} | ${chapterCell(it)} |`),
       '');
   }
   const dir = resolve(join(TARGET_DIR, folder));

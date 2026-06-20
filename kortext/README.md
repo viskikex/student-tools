@@ -124,6 +124,8 @@ Once you have it, open this folder in Claude Code and ask in plain language, e.g
 
 Claude reads the chapter and writes a `NN-...notes.md` file next to it with core ideas, key terms, cross-chapter connections, and self-test questions. Notes cite **section numbers** (like `§2.2`) rather than page numbers, because the source carries stable section numbering instead of print pages.
 
+Each notes file aliases itself `chNN-notes` in its frontmatter (chapter 3 → `ch03-notes`). That's a one-way convenience for anyone also running the sibling [`canvas-grabber`](../canvas-grabber) tool: its week-view links to `[[chNN-notes]]`, so the link resolves to these notes in a shared Obsidian vault. kortext neither reads nor needs that tool — the alias is harmless on its own.
+
 The two skills that power this live in `.claude/skills/` and load automatically when you open the folder in Claude Code:
 
 - **kortext-import** — runs the import pipeline above from natural-language requests ("import my textbook")

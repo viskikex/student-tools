@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inline, cell } from './md-util.js';
+import { inline, cell, chapterRef } from './md-util.js';
 
 const wikilinkPayloads = [
   '[[note]]',
@@ -66,4 +66,42 @@ test('inline() defang is idempotent', () => {
     const once = inline(p);
     assert.equal(inline(once), once);
   }
+});
+
+// chapterRef is the cross-tool join key: a chapter number, zero-padded to 2 digits,
+// or null. It must read spelled-out numbers ("Chapter Ten" -> "10") and must NOT fire
+// on week/module numbers or on "ch" buried inside an unrelated word.
+test('chapterRef reads digit chapter forms, zero-padded', () => {
+  assert.equal(chapterRef('Chapter 3 Quiz'), '03');
+  assert.equal(chapterRef('ch10'), '10');
+  assert.equal(chapterRef('Chap 7 reading'), '07');
+  assert.equal(chapterRef('CHAPTER 12 — notes'), '12');
+  assert.equal(chapterRef('chapter5'), '05');
+});
+
+test('chapterRef reads spelled-out chapter numbers (Ten -> 10)', () => {
+  assert.equal(chapterRef('Chapter Ten Quiz'), '10');
+  assert.equal(chapterRef('Chapter three discussion'), '03');
+  assert.equal(chapterRef('chapter twenty'), '20');
+});
+
+test('chapterRef is chapter-only: week/module/unit numbers do not match', () => {
+  assert.equal(chapterRef('Week 10 reading'), null);
+  assert.equal(chapterRef('Module 2 overview'), null);
+  assert.equal(chapterRef('Unit 4'), null);
+  assert.equal(chapterRef('Lecture 6 slides'), null);
+});
+
+test('chapterRef does not latch onto "ch" inside other words', () => {
+  assert.equal(chapterRef('March 3 assignment'), null);
+  assert.equal(chapterRef('Research 7 methods'), null);
+  assert.equal(chapterRef('a teaching 5'), null);
+});
+
+test('chapterRef returns null when no chapter is named', () => {
+  assert.equal(chapterRef('Syllabus'), null);
+  assert.equal(chapterRef('Welcome to the course'), null);
+  assert.equal(chapterRef(''), null);
+  assert.equal(chapterRef(null), null);
+  assert.equal(chapterRef(undefined), null);
 });

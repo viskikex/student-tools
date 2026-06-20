@@ -50,6 +50,32 @@ export function cleanTitle(name) {
   return String(name ?? '').replace(/\s*\(Sect:.*$/i, '').trim();
 }
 
+// Spelled-out chapter numbers, so "Chapter Ten Quiz" and "ch10" land on the same
+// handle. 1-20 covers any realistic syllabus.
+const NUMWORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+  eighteen: 18, nineteen: 19, twenty: 20,
+};
+
+// Pull a CHAPTER number out of a title and return it zero-padded to 2 digits
+// ("Chapter Ten Quiz" -> "10", "ch3" -> "03"), or null if the title names no chapter.
+// Chapter-ONLY on purpose: it deliberately does NOT match week/module/unit/lecture
+// numbers, so "Week 10 reading" can't forge a link to chapter 10's notes. This is the
+// canonical join key for the cross-tool wikilinks the week-view emits ([[chNN]] ->
+// slides deck, [[chNN-notes]] -> kortext notes). readings.js's broader chapterTag()
+// reuses it for the chapter branch of its slide-deck file naming.
+export function chapterRef(title) {
+  const s = (title ?? '').toLowerCase();
+  // \b-anchors the "ch" so it can't latch onto the "ch" buried in an unrelated word:
+  // "March 3" / "Research 7" must NOT read as chapters.
+  let m = s.match(/\bch(?:p|ap(?:ter)?)?[\s_-]*(\d{1,2})/);
+  if (m) return String(Number(m[1])).padStart(2, '0');
+  m = s.match(/\bch(?:apter)?[\s_-]*([a-z]+)/);
+  if (m && NUMWORDS[m[1]]) return String(NUMWORDS[m[1]]).padStart(2, '0');
+  return null;
+}
+
 // True if `dir` is `root` itself or sits inside it — i.e. it has NOT escaped via
 // "../". The containment guard for hand-edited vault-map folder values; shared by
 // parse.js and readings.js so the security check can't drift between them.

@@ -23,6 +23,7 @@ Write structured study notes for one chapter of a textbook in the local corpus.
    book: <from source frontmatter>
    chapter: N
    chapter_title: <from source>
+   aliases: [chNN-notes]
    generated_at: <YYYY-MM-DD>
    ---
 
@@ -40,6 +41,13 @@ Write structured study notes for one chapter of a textbook in the local corpus.
    ## Self-test questions
    5–10 questions that probe whether you actually understand the mechanisms, not just the vocabulary. Mix definition, application, and "why" questions. Don't write the answers — the point is to make her think.
    ```
+
+   The `aliases: [chNN-notes]` line is the cross-tool join handle: **NN is the chapter
+   number zero-padded to 2 digits** (chapter 3 → `ch03-notes`, chapter 10 → `ch10-notes`).
+   This lets the canvas-grabber week-view's `[[chNN-notes]]` wikilink resolve to these
+   notes inside a shared Obsidian vault. It's a one-way convention — nothing here reads or
+   depends on canvas-grabber; the alias just lets a link find this file if that tool is
+   also in use. Keep the padding exact or the link won't resolve.
 
 ## Quality rules
 
