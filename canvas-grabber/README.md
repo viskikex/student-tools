@@ -28,6 +28,8 @@ By default these land in `output/` (each course in a folder named after its cour
 
 It also dumps the raw data it pulled from Canvas into `output/` as JSON (courses, assignments, modules, files, discussions, quizzes, calendar events, and more) in case you ever want to do something fancier with it. (It deliberately does **not** touch your Canvas inbox.)
 
+One of those JSON files is curated rather than raw: **`output/schedule.json`** — a normalized, machine-readable feed of everything outstanding (the same set as `_upcoming.md`, soonest-first), one flat array of `{ source, title, course, type, due_at, points, url, status, overdue, … }` wrapped with a `generated_at` timestamp so a consumer can tell when the data went stale. It's there for scripts and assistants that want to *act* on your due dates rather than read them. Like everything else here it's a static re-run-to-refresh file, not a live feed.
+
 ---
 
 ## How it works (the 30-second version)

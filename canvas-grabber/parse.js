@@ -1,6 +1,7 @@
 import { readFile, readdir, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 // Markdown-safety + course-identity helpers live in md-util.js (the single copy,
 // shared with readings.js) so the `[[` defang and containment guard can't drift
 // between emitters.
@@ -151,6 +152,75 @@ async function gatherCourses() {
   return courses;
 }
 
+// Shared by the _upcoming.md dashboard and the schedule.json feed so the human
+// view and the machine feed render the EXACT same outstanding set, soonest-first
+// (undated last). Keeping one source means the JSON an agent acts on can never
+// quietly disagree with the Markdown Allie reads.
+function outstandingRows(courses) {
+  const rows = [];
+  for (const c of courses) {
+    for (const a of c.assignments) {
+      if (!isOutstanding(a)) continue;
+      rows.push({ due: a.due_at ? new Date(a.due_at) : null, course: c, a });
+    }
+  }
+  rows.sort((x, y) => {
+    if (!x.due) return 1;
+    if (!y.due) return -1;
+    return x.due - y.due;
+  });
+  return rows;
+}
+
+// ---- machine-readable feed: schedule.json ----
+// A static re-run-to-refresh emit (same ethos as the Markdown), NOT a live
+// service — it's just the outstanding set as structured data an agent can act
+// on. Crossing tools (merging in the syllabus key-dates) is deliberately a
+// CONSUMER-side concern: each student-tool emits its own independent slice and
+// never reads another's output (see student-tools/CLAUDE.md).
+
+// Coarse kind for downstream consumers. Canvas gives no single clean "type", so
+// derive it: discussions submit as a discussion_topic; quizzes flag
+// is_quiz_assignment / is_quiz_lti_assignment or declare an online_quiz
+// submission type; everything else is a plain assignment.
+function assignmentType(a) {
+  if (isDiscussion(a)) return 'discussion';
+  if (a.is_quiz_assignment || a.is_quiz_lti_assignment || (a.submission_types ?? []).includes('online_quiz')) {
+    return 'quiz';
+  }
+  return 'assignment';
+}
+
+// The outstanding set as a normalized feed. `source` is stamped per-item (not
+// just feed-level) so items stay self-describing once merged with the syllabus
+// slice. generated_at lets a consumer detect a stale feed (e.g. a dead sync
+// cron) instead of trusting month-old due dates.
+function scheduleFeed(courses, now = new Date()) {
+  const items = outstandingRows(courses).map(({ due, course, a }) => ({
+    source: 'canvas',
+    id: a.id,
+    title: a.name ?? null,
+    course: course.shortCode,
+    course_name: course.name,
+    type: assignmentType(a),
+    due_at: a.due_at ?? null,            // raw ISO UTC; undated -> null
+    points: a.points_possible ?? null,
+    url: a.html_url ?? null,
+    status: submissionStatus(a),
+    submitted: !notYetSubmitted(a),
+    overdue: Boolean(due && due < now && notYetSubmitted(a)),
+  }));
+  return { generated_at: now.toISOString(), timezone: TZ, source: 'canvas', count: items.length, items };
+}
+
+async function writeScheduleFeed(courses) {
+  await mkdir(OUTPUT_DIR, { recursive: true });
+  const path = join(OUTPUT_DIR, 'schedule.json');
+  const feed = scheduleFeed(courses);
+  await writeFile(path, JSON.stringify(feed, null, 2) + '\n');
+  console.log(`wrote ${path} (${feed.count} outstanding)`);
+}
+
 // ---- output: per-course hubs + vault-wide dashboards ----
 
 // The one-line note appended wherever a discussion appears as outstanding, so
@@ -238,20 +308,9 @@ async function writeOutput(courses) {
     console.log(`wrote ${path}`);
   }
 
-  // Vault-wide dashboards.
+  // Vault-wide dashboards. Same outstanding set the schedule.json feed emits.
   const now = new Date();
-  const allOutstanding = [];
-  for (const c of courses) {
-    for (const a of c.assignments) {
-      if (!isOutstanding(a)) continue;
-      allOutstanding.push({ due: a.due_at ? new Date(a.due_at) : null, course: c, a });
-    }
-  }
-  allOutstanding.sort((x, y) => {
-    if (!x.due) return 1;
-    if (!y.due) return -1;
-    return x.due - y.due;
-  });
+  const allOutstanding = outstandingRows(courses);
 
   const upcomingMd = [
     '# Upcoming & Outstanding', `_Synced ${stamp(new Date(), TZ)}_`, '',
@@ -284,9 +343,19 @@ async function main() {
   const courses = await gatherCourses();
   console.log(`writing to ${TARGET_DIR}`);
   await writeOutput(courses);
+  // Machine-readable feed for agents (Reminders/Calendar, etc.). Always lands in
+  // OUTPUT_DIR next to the raw JSON, not in the vault — it's data, not a note.
+  await writeScheduleFeed(courses);
 }
 
-main().catch(err => {
-  console.error('fatal:', err.message);
-  process.exit(1);
-});
+// Only run the pipeline when invoked directly (`node parse.js`); stay importable
+// so tests can exercise scheduleFeed/assignmentType without running a sync.
+const invokedDirectly = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) {
+  main().catch(err => {
+    console.error('fatal:', err.message);
+    process.exit(1);
+  });
+}
+
+export { scheduleFeed, assignmentType, outstandingRows };
