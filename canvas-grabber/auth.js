@@ -25,6 +25,15 @@ if (!BASE_URL) {
 const LOGIN_HOST = process.env.CANVAS_LOGIN_HOST
   ?? `login.${new URL(BASE_URL).hostname.split('.').slice(1).join('.')}`;
 
+// Where to BEGIN the login. Some schools don't redirect straight to SSO when you
+// hit the Canvas root — they land you on a marketing/info page with a "Login"
+// button you'd otherwise have to click by hand (which also blocks any unattended
+// re-auth). If your school does this, set CANVAS_LOGIN_START_URL to the URL that
+// button points to — for SAML schools it's usually <canvas-host>/login/saml.
+// When set, login navigates straight there, skipping the click. Defaults to
+// BASE_URL (the original behavior: go to Canvas and wait for its auto-redirect).
+const LOGIN_START_URL = process.env.CANVAS_LOGIN_START_URL || BASE_URL;
+
 async function isAuthenticated(context) {
   const page = await context.newPage();
   try {
@@ -53,7 +62,7 @@ async function login(netid, password, storageState) {
   const escapedHost = LOGIN_HOST.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const loginHostRe = new RegExp(`^https?://${escapedHost}(?:[:/?#]|$)`);
   try {
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.goto(LOGIN_START_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.waitForURL(loginHostRe, { timeout: 30_000 });
     await page.fill('input[name="username"], input[id="username"], input[name="j_username"]', netid);
     await page.fill('input[name="password"], input[id="password"], input[name="j_password"]', password);
