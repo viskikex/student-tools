@@ -23,6 +23,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -36,7 +37,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # converted body + the filename-stem heading below so a syllabus can't pull other
 # vault notes into the output. Safe on converter output, which never emits real
 # wikilinks.
-from syllabus.dates import defang, extract_dates, infer_year, render_table
+from syllabus.dates import (
+    defang,
+    extract_dates,
+    infer_year,
+    render_table,
+    schedule_feed,
+)
 
 SYLLABUS_DIR = Path(os.environ.get("SYLLABUS_DIR") or Path.home() / "syllabi")
 
@@ -115,9 +122,20 @@ def main() -> None:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(md, encoding="utf-8")
+
+    # Machine-readable sibling: the same key dates as a normalized slice that an
+    # agent/script can act on. Co-located with the .md, one slice per syllabus.
+    # The .md is the product; this is an optional structured export.
+    feed = schedule_feed(entries, source_file=input_path.name)
+    schedule_path = output_path.with_name(output_path.stem + ".schedule.json")
+    schedule_path.write_text(
+        json.dumps(feed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
     print(f"converted:  {input_path.name}")
     print(f"key dates:  {len(entries)} found (assumed year {year})")
     print(f"written:    {output_path}")
+    print(f"feed:       {schedule_path}")
 
 
 if __name__ == "__main__":

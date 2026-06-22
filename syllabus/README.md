@@ -103,6 +103,8 @@ setx SYLLABUS_DIR "$HOME\Documents\Obsidian Vault\school\multicultural-psych"
 
 The `--out` flag always wins over `SYLLABUS_DIR` for a single run.
 
+Alongside each `<name>.md`, the tool also writes a `<name>.schedule.json` — the same key dates as a small, normalized feed (`{ source, title, due_at, weekday, past, … }` wrapped with a `generated_at` timestamp) for scripts or assistants that want to *act* on the dates rather than read them. The Markdown is the product; the JSON is an optional structured export. `due_at` is date-only (`YYYY-MM-DD`) — a syllabus never states a time, so the tool doesn't invent one. Like everything here it's a static re-run-to-refresh file, not a live feed; ignore it if you just want the notes.
+
 ---
 
 ## What it does and doesn't do

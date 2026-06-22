@@ -8,9 +8,10 @@ paragraph six of the late-work policy.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import Counter
-from datetime import date
+from datetime import date, datetime, timezone
 
 _MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
@@ -113,3 +114,69 @@ def render_table(entries: list[tuple[date, str]]) -> str:
     for d, context in entries:
         lines.append(f"| {d:%Y-%m-%d} | {d:%a} | {context} |")
     return "\n".join(lines)
+
+
+# ---- machine-readable feed: <slug>.schedule.json ----
+# A structured export of the same key dates render_table() renders, sharing the
+# canvas-grabber slice's contract so the two can be merged downstream by a
+# consumer (e.g. an assistant). Cross-tool merging is deliberately NOT done here:
+# this tool only ever emits its own slice and never reads another's output
+# (student-tools/CLAUDE.md). Like the .md, it's a static re-run-to-refresh file.
+
+
+def _date_id(d: date, context: str) -> str:
+    """Stable id for a key date, so a consumer can dedupe across re-runs. The
+    (date, context) pair is already the extractor's dedupe key, so hashing it
+    yields the same id every run for the same row."""
+    digest = hashlib.sha1(f"{d.isoformat()}|{context}".encode("utf-8")).hexdigest()
+    return f"{d.isoformat()}-{digest[:8]}"
+
+
+def key_date_items(
+    entries: list[tuple[date, str]], source_file: str, today: date | None = None
+) -> list[dict]:
+    """Normalize (date, context) pairs into schedule items.
+
+    Shares the canvas slice's core keys — ``source``, ``title``, ``type``,
+    ``due_at`` — so a merge is trivial. ``due_at`` is **date-only** ISO
+    (``YYYY-MM-DD``): a syllabus never states a time, so we don't invent one — a
+    consumer treats it as all-day. Syllabus-specific extras: ``weekday`` (the
+    computed day, which catches professor typos), ``past`` (date is before
+    today — note this is NOT canvas's ``overdue``, which also means unsubmitted;
+    a key date can be a finished exam or a holiday), and ``source_file``.
+    """
+    today = today or date.today()
+    return [
+        {
+            "source": "syllabus",
+            "id": _date_id(d, context),
+            "title": context,
+            "course": None,          # syllabus has no reliable course identity (CLAUDE.md)
+            "type": "key-date",
+            "due_at": d.isoformat(),  # date-only; time unknown
+            "weekday": f"{d:%a}",
+            "past": d < today,
+            "source_file": source_file,
+        }
+        for d, context in entries
+    ]
+
+
+def schedule_feed(
+    entries: list[tuple[date, str]],
+    source_file: str,
+    *,
+    now: datetime | None = None,
+    today: date | None = None,
+) -> dict:
+    """Wrap the items with staleness metadata, mirroring the canvas slice's
+    envelope. ``timezone`` is null because the dates are tz-naive (date-only)."""
+    now = now or datetime.now(timezone.utc)
+    items = key_date_items(entries, source_file, today=today)
+    return {
+        "generated_at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "timezone": None,
+        "source": "syllabus",
+        "count": len(items),
+        "items": items,
+    }
