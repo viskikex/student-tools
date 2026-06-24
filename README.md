@@ -9,9 +9,6 @@ A small collection of personal tools for studying. Each one lives in its own fol
 | [**slides/**](slides/) | Converts `.pptx` lecture slide decks into Markdown. |
 | [**syllabus/**](syllabus/) | Converts a syllabus (`.docx` or `.pdf`) into Markdown, led by an auto-extracted table of the dates it finds in the document. |
 
-## Disclaimer
-I only use macos, windows usability is theoretical although it should work....
-
 ## The idea
 
 Every tool here spits out **plain Markdown** — text files you own, sitting on your own disk. That's deliberate. Aim them all at a single [Obsidian](https://obsidian.md) vault (a free app that turns a folder of Markdown into a linked, searchable notebook) and you get one clean study dashboard where everything lives together:
@@ -26,18 +23,29 @@ No dashboard to log into, no five tabs to keep open, no live integration to rot.
 
 You don't *have* to use Obsidian — it's all readable in any text editor — but that's the workflow these were built for.
 
+> **New to Obsidian? A "vault" is just a folder.** Download the free app from [obsidian.md](https://obsidian.md), open it, choose **Create new vault**, and pick (or make) a folder to hold your studies — say `Documents/Obsidian Vault/school`. That folder *is* your vault; Obsidian simply gives you a nice linked view of the Markdown inside it. Then point the tools at that same folder via the settings below (`VAULT_DIR`, `SLIDES_DIR`, `SYLLABUS_DIR`) and their output lands right in it. You can also skip Obsidian entirely and just open the files in any text editor.
+
 > **One caveat on "aim them at a vault":** canvas-grabber (`VAULT_DIR`), slides (`SLIDES_DIR`), and syllabus (`SYLLABUS_DIR`) each take a setting that writes straight into your vault. kortext is the exception — it always writes its textbook corpus to its own `corpus/<slug>/` folder, which you then move or symlink into the vault yourself. Each tool's README covers its own destination.
 
 ## Getting started
 
-**First, get the code.** Everything lives in this one repo, so you grab it once:
+**First, open a terminal.** This is where you'll type the commands below.
+- **Mac:** press `Cmd+Space`, type "Terminal", hit Enter.
+- **Windows:** press the Windows key, type "PowerShell", hit Enter.
+- **Linux:** you know where it is.
+
+**Then get the code.** Everything lives in this one repo, so you grab it once. There are two ways — pick whichever sounds easier:
+
+**Option A — Download the ZIP (no extra tools needed).** On the [GitHub page](https://github.com/viskikex/student-tools), click the green **Code** button → **Download ZIP**, then unzip it. This gives you a folder called **`student-tools-main`** (see the note below).
+
+**Option B — Use `git`** (if you have it):
 
 ```bash
 git clone https://github.com/viskikex/student-tools.git
 cd student-tools
 ```
 
-(No `git`? Use the green **Code → Download ZIP** button on the GitHub page, unzip it, and open the resulting folder.)
+> **One gotcha if you took Option A (ZIP):** the folder is named **`student-tools-main`**, not `student-tools`. So wherever a tool's README says `cd student-tools/kortext`, you type `cd student-tools-main/kortext` instead (same for `slides`, `syllabus`, `canvas-grabber`). Renaming the folder to `student-tools` after unzipping also works if you'd rather the examples match exactly.
 
 You don't install "student-tools" as a whole. Pick the tool you want and follow the README inside **its** folder — each one walks you through setup from scratch, starting from that tool's folder:
 
@@ -61,7 +69,9 @@ It depends which tool you're using — each README spells it out, but in short:
 
 > The two login-based tools (**canvas-grabber**, **kortext**) each download a [Playwright](https://playwright.dev) browser engine on first setup (~150 MB once) to drive their sign-on; **slides** and **syllabus** are pure Python with no extra downloads.
 
-Not sure if you have these? Open a terminal and type `node --version` or `python3 --version` — if you see a version number, you're set; if not, the links above will get you there.
+Not sure if you have these? Open a terminal and type `node --version` or `python3 --version` (on Windows, Python's check is `py --version`) — if you see a version number, you're set; if not, the links above will get you there.
+
+> **A note on Windows:** these were developed and used day-to-day on macOS. The Windows (PowerShell) steps are written out everywhere and should work, but they're less battle-tested — if something doesn't behave on Windows, that's a gap to report, not you doing it wrong.
 
 ## A note on responsible use
 

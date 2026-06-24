@@ -68,6 +68,8 @@ That's it. You won't need to repeat this unless you move the folder.
 
 There are three steps to import a book — **log in → download → build** — plus an optional one (between log-in and download) to find a book's ID. All commands are run from inside this `kortext/` folder.
 
+> **Two things you'll need for the download step:** a **book ID** (the number in the reader's address bar — see the optional step below) and a **slug**, a short hyphenated name you choose for the book's folder (e.g. `intro-psych`). Don't worry about them until Step 2 asks; they're just flagged here so the `<BOOK_ID>` / `<slug>` placeholders aren't a surprise.
+
 > **Using Claude Code? You can skip the commands.** If you've installed Claude Code (the optional tool described above), just open this folder in it and ask in plain language — *"import my textbook"* — and it'll walk the whole pipeline below for you, asking for the book ID and slug as it goes. The commands here are the manual path for people who'd rather not use it (or don't want to install it just to import). Either way, **no AI is required to import** — the commands are plain Python.
 
 > **On Windows:** in every command below, replace the `.venv/bin/` prefix with `.venv\Scripts\` — everything after it is the same.

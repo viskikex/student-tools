@@ -7,7 +7,7 @@ A small command-line tool that downloads a copy of **your own** data from [Canva
 
 No more clicking through six different course pages to figure out what's due this week. Run one command and read plain text files — dropped into the same [Obsidian](https://obsidian.md) vault as your notes, textbook, and slides, so your due dates sit right next to the material they're about. (It works fine as plain files in any editor too.)
 
-> ⚠️ **Before you start:** this tool talks to your school's Canvas, which you set in a `.env` file (one line — your Canvas web address). See [Setup](#setup-step-by-step). The login step may need tweaking for schools with unusual single sign-on; see [Using a different school](#using-a-different-school).
+> ⚠️ **Before you start:** this tool logs into your school's Canvas using a small `.env` file you create — your Canvas login plus your school's Canvas web address (a few lines; the password stays on your machine). See [Setup](#setup-step-by-step). The login step may need tweaking for schools with unusual single sign-on; see [Using a different school](#using-a-different-school).
 
 ---
 
@@ -71,7 +71,7 @@ This tool needs Node.js (a program that runs JavaScript on your computer), **ver
 
 - Go to [nodejs.org](https://nodejs.org) and download the **LTS** version.
 - Install it like any other app.
-- To confirm it worked, open a terminal (on Mac: **Terminal**; on Windows: **PowerShell**) and type:
+- To confirm it worked, open a terminal — **Mac:** press `Cmd+Space`, type "Terminal", hit Enter; **Windows:** press the Windows key, type "PowerShell", hit Enter — and type:
   ```bash
   node --version
   ```
@@ -114,6 +114,11 @@ Copy-Item .env.example .env
 ```
 
 (Or just duplicate `.env.example` in your file explorer and rename the copy to `.env`.)
+
+> 👻 **Heads up — these are "dotfiles," which are hidden by default.** A name starting with a dot (`.env`) is invisible in Finder/Explorer until you turn hidden files on, so you may not even see `.env.example` to copy it. Two traps to know:
+> - **Mac:** in Finder, press `Cmd+Shift+.` (period) to toggle hidden files into view.
+> - **Windows:** File Explorer hides file *extensions* by default, so renaming a copy to `.env` can quietly leave you with `.env.txt`, which the tool won't read. Turn on **View → Show → File name extensions** first so you can see and remove the `.txt`.
+> The `cp` / `Copy-Item` commands above avoid both problems entirely — when in doubt, use those instead of doing it by hand.
 
 Then open `.env` in any text editor and set:
 
