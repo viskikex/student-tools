@@ -53,7 +53,7 @@ export async function fetchOne(path) {
 //  - write atomically (.part then rename) so a crash/timeout never leaves a
 //    truncated file that looks complete.
 // Returns the number of bytes written.
-export async function downloadFile(url, destPath, { maxBytes = Infinity } = {}) {
+export async function downloadFile(url, destPath, { maxBytes = Infinity, expectedType = null } = {}) {
   const r = await req();
   const full = url.startsWith('http') ? url : `${BASE_URL}${url}`;
 
@@ -76,8 +76,15 @@ export async function downloadFile(url, destPath, { maxBytes = Infinity } = {}) 
   const res = await r.get(full);
   if (!res.ok()) throw new Error(`${res.status()} ${res.statusText()} — ${full}`);
   const ctype = (res.headers()['content-type'] ?? '').toLowerCase();
-  if (ctype.includes('text/html')) {
-    throw new Error('received HTML (expired session / login page?), not a file');
+  // text/html is never a legitimate file body (expired session / login page).
+  // When the caller knows the expected type (from Canvas file metadata), also
+  // reject a mismatch to a generic error-envelope type (json/plain) rather than
+  // rejecting text/plain outright — some legitimate attachments ARE text/plain.
+  const isErrorEnvelope = ctype.includes('text/html')
+    || (expectedType && !ctype.includes(expectedType)
+        && (ctype.includes('application/json') || ctype === 'text/plain'));
+  if (isErrorEnvelope) {
+    throw new Error(`received ${ctype || 'unknown'} (expired session or error response?), not a file`);
   }
   const buf = await res.body();
   if (buf.length > maxBytes) {

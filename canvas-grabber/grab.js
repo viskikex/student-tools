@@ -9,6 +9,17 @@ async function save(dir, name, data) {
   console.log(`  saved ${dir}/${name}.json (${Array.isArray(data) ? data.length + ' items' : '1 item'})`);
 }
 
+// Tracks rejections across all grabCourse calls so main() can tell a genuine
+// per-endpoint failure (a few 403s on locked content, normal) apart from a
+// session that expired mid-grab (most/all requests start failing with 401) —
+// the latter must abort loudly instead of letting parse.js render an
+// empty-but-plausible "all caught up" hub from the resulting missing files.
+const authFailureTracker = { total: 0, unauthorized: 0 };
+
+function isUnauthorized(err) {
+  return /^401\b/.test(err?.message ?? '');
+}
+
 async function grabCourse(course) {
   const id = course.id;
   const slug = `${id}_${(course.course_code ?? course.name ?? String(id)).replace(/\W+/g, '_')}`;
@@ -55,7 +66,11 @@ async function grabCourse(course) {
   // Promise.allSettled swallows rejections — surface them so a missing file
   // isn't silently mysterious.
   for (const r of results) {
-    if (r.status === 'rejected') console.error(`  ${slug}: ${r.reason?.message ?? r.reason}`);
+    if (r.status === 'rejected') {
+      console.error(`  ${slug}: ${r.reason?.message ?? r.reason}`);
+      authFailureTracker.total++;
+      if (isUnauthorized(r.reason)) authFailureTracker.unauthorized++;
+    }
   }
 }
 
@@ -96,6 +111,19 @@ async function main() {
     await grabCourse(course).catch(err =>
       console.error(`  error in course ${course.id}: ${err.message}`)
     );
+  }
+
+  // A session that expired mid-grab manifests as most/all per-course requests
+  // failing with 401 — Promise.allSettled already logged each one, but without
+  // this check parse.js would read the resulting missing files as empty arrays
+  // and render a plausible-looking "all caught up" hub instead of the truth.
+  if (authFailureTracker.total > 0 && authFailureTracker.unauthorized / authFailureTracker.total >= 0.5) {
+    console.error(
+      `\nsession expired mid-grab (${authFailureTracker.unauthorized}/${authFailureTracker.total} ` +
+      'requests failed with 401) — run `npm run auth` and re-run grab.'
+    );
+    process.exitCode = 1;
+    return;
   }
 
   console.log('\ndone.');

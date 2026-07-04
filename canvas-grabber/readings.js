@@ -145,8 +145,10 @@ function chapterTag(name) {
   const direct = chapterRef(name);
   if (direct) return direct;
   const s = (name ?? '').toLowerCase();
-  const m = s.match(/\bpp[\s_-]*(\d{1,2})/)
-    || s.match(/\b(?:week|wk|module|mod|unit|lec(?:ture)?)[\s_-]*(\d{1,2})/);
+  // 'pp' removed: it's ambiguous with "pages" ("Read pp 12-20" means pages, not
+  // chapter) and false-positived on that exact phrasing. week/module/unit/lec
+  // are unambiguous enough to keep.
+  const m = s.match(/\b(?:week|wk|module|mod|unit|lec(?:ture)?)[\s_-]*(\d{1,2})/);
   return m ? String(Number(m[1])).padStart(2, '0') : null;
 }
 
@@ -157,6 +159,7 @@ function safeName(name, fallback) {
     .replace(/[\/\\]+/g, '_')      // no path separators from Canvas filenames
     .replace(/[\x00-\x1f]/g, '')   // strip control chars
     .replace(/\.{2,}/g, '.')       // no "../"
+    .replace(/[[\]|]/g, '_')       // no [ ] | — sourceCell wraps basenames in [[...]]
     .trim();
   if (!s) s = fallback;
   if (s.length > 120) {
@@ -309,7 +312,7 @@ async function downloadCourse(c, folder) {
       }
 
       try {
-        const n = await downloadFile(meta.url, dest, { maxBytes: MAX_FILE_BYTES });
+        const n = await downloadFile(meta.url, dest, { maxBytes: MAX_FILE_BYTES, expectedType: ct || null });
         totalBytes += n;
         summary.downloaded++;
         it._local = dest;
@@ -411,12 +414,16 @@ async function main() {
     await writeReadingsMd(c, folder, now);
   }
 
-  if (queue.length && !DRY_RUN) {
+  // Always (over)write the queue, even when empty, so a stale queue from a
+  // prior DOWNLOAD=1 run doesn't linger and get re-processed by convert-slides.
+  if (!DRY_RUN) {
     const qpath = join(OUTPUT_DIR, 'slides-convert-queue.tsv');
     await mkdir(OUTPUT_DIR, { recursive: true });
-    await writeFile(qpath, queue.map(r => r.join('\t')).join('\n') + '\n');
-    console.log(`\nqueued ${queue.length} deck(s) for slide conversion -> ${qpath}`);
-    console.log('run `npm run convert-slides` to turn them into markdown in the vault.');
+    await writeFile(qpath, queue.length ? queue.map(r => r.join('\t')).join('\n') + '\n' : '');
+    if (queue.length) {
+      console.log(`\nqueued ${queue.length} deck(s) for slide conversion -> ${qpath}`);
+      console.log('run `npm run convert-slides` to turn them into markdown in the vault.');
+    }
   }
 
   if (DOWNLOAD) {

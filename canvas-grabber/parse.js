@@ -40,9 +40,14 @@ function formatDate(iso) {
 // (soonest first) or descending. Used for the outstanding list and the full
 // gradebook, which want opposite directions.
 const byDueDate = (asc) => (a, b) => {
-  if (!a.due_at) return 1;
-  if (!b.due_at) return -1;
-  return asc ? new Date(a.due_at) - new Date(b.due_at) : new Date(b.due_at) - new Date(a.due_at);
+  const at = a.due_at ? new Date(a.due_at).getTime() : NaN;
+  const bt = b.due_at ? new Date(b.due_at).getTime() : NaN;
+  const aValid = !Number.isNaN(at);
+  const bValid = !Number.isNaN(bt);
+  if (!aValid && !bValid) return 0;
+  if (!aValid) return 1;
+  if (!bValid) return -1;
+  return asc ? at - bt : bt - at;
 };
 
 function cleanCourseName(code) {
@@ -73,7 +78,8 @@ function notYetSubmitted(a) {
   return !s.excused
     && s.workflow_state !== 'graded'
     && s.workflow_state !== 'submitted'
-    && s.workflow_state !== 'pending_review';
+    && s.workflow_state !== 'pending_review'
+    && s.workflow_state !== 'pending';
 }
 
 // Short submission-state label. (Numeric score lives in its own column via
@@ -83,8 +89,10 @@ function submissionStatus(a) {
   if (!sub) return isDiscussion(a) ? 'not started' : 'not submitted';
   if (sub.excused) return 'excused';
   if (sub.workflow_state === 'graded') return 'graded';
-  if (sub.workflow_state === 'submitted' || sub.workflow_state === 'pending_review') {
+  if (sub.workflow_state === 'submitted' || sub.workflow_state === 'pending_review'
+      || sub.workflow_state === 'pending') {
     // Honest about what "submitted" means for a discussion: initial post only.
+    // 'pending' = moderated-assignment submission awaiting moderation, not "nothing submitted".
     return isDiscussion(a) ? 'initial post in · replies not tracked' : 'submitted · awaiting grade';
   }
   return isDiscussion(a) ? 'not started' : 'not submitted';
@@ -161,7 +169,8 @@ function outstandingRows(courses) {
   for (const c of courses) {
     for (const a of c.assignments) {
       if (!isOutstanding(a)) continue;
-      rows.push({ due: a.due_at ? new Date(a.due_at) : null, course: c, a });
+      const t = a.due_at ? new Date(a.due_at).getTime() : NaN;
+      rows.push({ due: Number.isNaN(t) ? null : new Date(t), course: c, a });
     }
   }
   rows.sort((x, y) => {
@@ -267,7 +276,7 @@ function courseHubMarkdown(c) {
     '| Assignment | Score | Status | Due |',
     '|------------|-------|--------|-----|',
     ...all.map(a =>
-      `| ${cell(a.name)} | ${scoreCell(a)} | ${submissionStatus(a)} | ${formatDate(a.due_at)} |`),
+      `| ${cell(a.name)} | ${cell(scoreCell(a))} | ${submissionStatus(a)} | ${formatDate(a.due_at)} |`),
     '');
 
   return lines.join('\n');
@@ -333,7 +342,7 @@ async function writeOutput(courses) {
     '| Course | Score | Grade |',
     '|--------|-------|-------|',
     ...courses.map(c =>
-      `| ${cell(c.shortCode)} — ${cell(c.name)} | ${c.score != null ? c.score + '%' : '—'} | ${c.grade ?? '—'} |`),
+      `| ${cell(c.shortCode)} — ${cell(c.name)} | ${c.score != null ? Number(c.score) + '%' : '—'} | ${cell(c.grade ?? '—')} |`),
   ];
   await writeFile(join(TARGET_DIR, '_grades.md'), gradesMd.join('\n') + '\n');
   console.log(`wrote ${join(TARGET_DIR, '_grades.md')} (${courses.length} courses)`);

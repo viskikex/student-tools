@@ -1,5 +1,5 @@
 import * as playwright from 'playwright';
-import { writeFile, readFile } from 'fs/promises';
+import { writeFile, readFile, chmod } from 'fs/promises';
 import { existsSync } from 'fs';
 
 // Which Playwright browser engine to use. webkit (Safari-like) is a good
@@ -110,8 +110,11 @@ async function main() {
     throw new Error('canvas_session cookie not found after login — check login flow.');
   }
   // mode 0o600: this file holds a live session cookie (full account access
-  // without the password) — keep it readable only by the owner.
+  // without the password) — keep it readable only by the owner. writeFile's
+  // mode option only applies on CREATE, so chmod explicitly to also tighten
+  // a pre-existing file (backup restore, copy between machines, etc).
   await writeFile(AUTH_STATE_FILE, JSON.stringify(newState, null, 2), { mode: 0o600 });
+  await chmod(AUTH_STATE_FILE, 0o600);
   console.log('.auth-state.json updated.');
 }
 

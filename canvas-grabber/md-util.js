@@ -68,11 +68,18 @@ const NUMWORDS = {
 export function chapterRef(title) {
   const s = (title ?? '').toLowerCase();
   // \b-anchors the "ch" so it can't latch onto the "ch" buried in an unrelated word:
-  // "March 3" / "Research 7" must NOT read as chapters.
-  let m = s.match(/\bch(?:p|ap(?:ter)?)?[\s_-]*(\d{1,2})/);
+  // "March 3" / "Research 7" must NOT read as chapters. '.' is allowed in the
+  // separator class so "Ch. 10" / "Chp. 3" match, same as the bare form.
+  let m = s.match(/\bch(?:p|ap(?:ter)?)?[\s_.-]*(\d{1,2})/);
   if (m) return String(Number(m[1])).padStart(2, '0');
-  m = s.match(/\bch(?:apter)?[\s_-]*([a-z]+)/);
-  if (m && NUMWORDS[m[1]]) return String(NUMWORDS[m[1]]).padStart(2, '0');
+  m = s.match(/\bch(?:apter)?[\s_.-]*([a-z]+)(\s+([a-z]+))?/);
+  if (m && NUMWORDS[m[1]]) {
+    // A second number-word right after ("Twenty One") is a compound (21-99)
+    // this 1-20 table doesn't cover — misreading it as "Twenty" (20) would be
+    // a wrong, silent chapter collision, so bail to null instead.
+    if (m[3] && NUMWORDS[m[3]] !== undefined) return null;
+    return String(NUMWORDS[m[1]]).padStart(2, '0');
+  }
   return null;
 }
 
@@ -98,9 +105,13 @@ export function stamp(d, tz) {
 // so a specific key like "PSYX362" beats a loose one like "PSY" instead of the
 // result depending on JSON key order. Numeric keys match the course id.
 export function resolveFolder(course, map) {
-  if (map[course.shortCode]) return map[course.shortCode];
+  const direct = map[course.shortCode];
+  if (typeof direct === 'string' && direct) return direct;
   for (const key of Object.keys(map).sort((a, b) => b.length - a.length)) {
-    if (String(course.id) === String(key) || course.rawCode.startsWith(key)) return map[key];
+    if (String(course.id) === String(key) || course.rawCode.startsWith(key)) {
+      const v = map[key];
+      if (typeof v === 'string' && v) return v;
+    }
   }
   return course.shortCode || course.slug;
 }

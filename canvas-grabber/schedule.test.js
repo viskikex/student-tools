@@ -80,3 +80,58 @@ test('each item carries the merge-ready shape', () => {
   }
   assert.equal(item.source, 'canvas');
 });
+
+test('pending workflow_state counts as submitted, not overdue', () => {
+  // Moderated-assignment submissions sit at workflow_state='pending' while
+  // awaiting moderation — the student HAS submitted (regression for the
+  // notYetSubmitted/submissionStatus fix; this state was previously treated
+  // as not-submitted).
+  const c = course([
+    assignment({ id: 1, due_at: '2026-01-01T00:00:00Z', submission: { workflow_state: 'pending' } }),
+  ]);
+  const item = scheduleFeed([c], NOW).items[0];
+  assert.equal(item.submitted, true);
+  assert.equal(item.overdue, false);
+  assert.equal(item.status, 'submitted · awaiting grade');
+});
+
+test('cross-year due date (past year) is still correctly overdue', () => {
+  const c = course([
+    assignment({ id: 1, due_at: '2025-12-15T00:00:00Z' }),
+  ]);
+  const item = scheduleFeed([c], NOW).items[0];
+  assert.equal(item.overdue, true);
+});
+
+test('empty courses array yields an empty feed, not a crash', () => {
+  const feed = scheduleFeed([], NOW);
+  assert.equal(feed.count, 0);
+  assert.deepEqual(feed.items, []);
+});
+
+test('course with zero assignments contributes nothing', () => {
+  const feed = scheduleFeed([course([])], NOW);
+  assert.equal(feed.count, 0);
+});
+
+test('null name and html_url surface as null, not throw', () => {
+  const c = course([assignment({ id: 1, name: null, html_url: null })]);
+  const item = scheduleFeed([c], NOW).items[0];
+  assert.equal(item.title, null);
+  assert.equal(item.url, null);
+});
+
+test('invalid due_at string sorts last, not into an undefined middle position', () => {
+  const c = course([
+    assignment({ id: 1, due_at: '2026-06-01T00:00:00Z' }),
+    assignment({ id: 2, due_at: 'garbage' }),
+    assignment({ id: 3, due_at: '2026-01-01T00:00:00Z' }),
+    assignment({ id: 4, due_at: '2026-12-01T00:00:00Z' }),
+    assignment({ id: 5, due_at: null }),
+  ]);
+  const ids = scheduleFeed([c], NOW).items.map(i => i.id);
+  // Sorted ascending soonest-first; invalid + null both land last (order between
+  // them unspecified, but neither may land in the dated middle).
+  assert.deepEqual(ids.slice(0, 3), [3, 1, 4]);
+  assert.deepEqual(new Set(ids.slice(3)), new Set([2, 5]));
+});
