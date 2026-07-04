@@ -21,6 +21,16 @@ PAYLOADS = [
     "![[embed]]",
     "![[[embed]]",
     "[[[[[deep]]",
+    # Backslash before [[ must not re-liven the wikilink after escaping.
+    "\\[[note]]",
+]
+MARKDOWN_ESCAPE_PAYLOADS = [
+    ("C:\\path\\x", "C:\\\\path\\\\x"),  # backslash escaped, not stripped
+    ("a|b", "a\\|b"),                     # pipe escaped
+    ("*em*", "\\*em\\*"),                 # asterisk escaped
+    ("_under_", "\\_under\\_"),           # underscore escaped
+    ("`code`", "\\`code\\`"),             # backtick escaped
+    ("C:\\path*_|", "C:\\\\path\\*\\_\\|"),  # all escapes compose
 ]
 
 # Markdown images auto-load remote URLs in Obsidian's reading view, so an
@@ -45,6 +55,21 @@ class DefangTest(unittest.TestCase):
     def test_clean_also_defangs(self):
         for p in PAYLOADS:
             self.assertNotIn("[[", _clean(p))
+
+
+    def test_clean_escapes_markdown_special_chars(self):
+        for raw, expected in MARKDOWN_ESCAPE_PAYLOADS:
+            self.assertEqual(_clean(raw), expected, f"_clean({raw!r}) escape mismatch")
+
+    def test_clean_defangs_even_after_backslash_escape(self):
+        # _defang must run AFTER backslash escaping; a backslash before [[
+        # must not re-liven the wikilink. Invariant: no live [[ survives _clean.
+        for p in PAYLOADS:
+            self.assertNotIn("[[", _clean(p), f"live [[ survived _clean({p!r})")
+
+    def test_clean_collapses_newlines(self):
+        self.assertEqual(_clean("Line 1\nLine 2"), "Line 1 Line 2")
+        self.assertEqual(_clean("a\tb"), "a b")
 
     def test_plain_text_untouched(self):
         self.assertEqual(_defang("a normal slide title"), "a normal slide title")

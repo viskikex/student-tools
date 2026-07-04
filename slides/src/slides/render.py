@@ -12,12 +12,10 @@ diagrams get an [image] placeholder.
 from __future__ import annotations
 
 import re
+import sys
+import zipfile
 from pathlib import Path
-from typing import Iterator
-
 from pptx import Presentation
-from pptx.util import Pt
-from pptx.enum.text import PP_ALIGN
 
 
 # ---------------------------------------------------------------------------
@@ -36,10 +34,16 @@ def _defang(text: str) -> str:
     text = re.sub(r"!(?=\[)", "!​", text)
     return re.sub(r"\[(?=\[)", "[​", text)
 
-
 def _clean(text: str) -> str:
-    """Normalize whitespace, strip control chars, and defang wikilinks."""
-    return _defang(re.sub(r"[ \t]+", " ", text).strip())
+    """Normalize whitespace (collapse newlines/tabs/spaces), escape markdown
+    emphasis chars and table pipes, and defang wikilinks. Applied to every
+    slide-text path so a multi-line title, a '*' in notes, or a pipe in a cell
+    can't break a heading, italic span, or table row."""
+    text = re.sub(r"\s+", " ", text).strip()
+    text = text.replace("\\", "\\\\")
+    text = text.replace("|", "\\|")
+    text = text.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`")
+    return _defang(text)
 
 
 def _shape_text_lines(shape) -> list[str]:
@@ -57,48 +61,85 @@ def _shape_text_lines(shape) -> list[str]:
     return lines
 
 
-def _shape_is_image_only(shape) -> bool:
-    """True if shape is a picture or chart (visual, no extractable text)."""
+def _visual_marker(shape) -> str | None:
+    """Marker for a visual-only shape (no extractable text), or None if the
+    shape is not visual-only. Distinguishes media (audio/video) from a still
+    image/chart rather than mislabeling everything '[image]'."""
     from pptx.enum.shapes import MSO_SHAPE_TYPE
-    return shape.shape_type in (
-        MSO_SHAPE_TYPE.PICTURE,
-        MSO_SHAPE_TYPE.MEDIA,
-    )
+    if shape.shape_type == MSO_SHAPE_TYPE.MEDIA:
+        return "[media]"
+    if shape.shape_type in (MSO_SHAPE_TYPE.PICTURE, MSO_SHAPE_TYPE.CHART):
+        return "[image]"
+    return None
 
 
-# ---------------------------------------------------------------------------
-# Slide rendering
-# ---------------------------------------------------------------------------
+def _iter_shapes(shapes):
+    """Yield shapes recursively, descending into GROUP shapes so grouped
+    textboxes/tables/images aren't silently dropped."""
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+    for shape in shapes:
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            yield from _iter_shapes(shape.shapes)
+        else:
+            yield shape
+
+
+def _find_title(shapes):
+    """Find a title placeholder, searching inside groups (slide.shapes.title
+    returns None when the title placeholder is grouped). Identifies titles by
+    placeholder type, not shapes.title (which only exists on SlideShapes)."""
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+    from pptx.enum.shapes import PP_PLACEHOLDER
+    for shape in shapes:
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            title = _find_title(shape.shapes)
+            if title is not None:
+                return title
+        else:
+            try:
+                pf = shape.placeholder_format
+            except ValueError:
+                pf = None
+            if pf is not None and pf.type in (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE):
+                return shape
+    return None
+
 
 def _slide_title(slide) -> str | None:
-    """Return slide title text, or None."""
-    if slide.shapes.title is None:
+    """Return slide title text, or None. Searches inside groups."""
+    title_shape = _find_title(slide.shapes)
+    if title_shape is None:
         return None
-    return _clean(slide.shapes.title.text) or None
+    return _clean(title_shape.text_frame.text) or None
 
 
 def _slide_to_md(slide_num: int, slide) -> str:
     """Render one slide as a markdown section."""
-    title = _slide_title(slide)
+    title_shape = _find_title(slide.shapes)
+    title = _clean(title_shape.text_frame.text) or None if title_shape else None
     heading = f"## Slide {slide_num}" + (f" — {title}" if title else "")
 
     body_lines: list[str] = []
-    has_image = False
+    visual_markers: list[str] = []
 
-    for shape in slide.shapes:
-        # Skip the title shape — already used above
-        if shape == slide.shapes.title:
+    for shape in _iter_shapes(slide.shapes):
+        # Skip the title shape — already used above (handles grouped titles too)
+        if shape == title_shape:
             continue
 
-        if _shape_is_image_only(shape):
-            has_image = True
+        marker = _visual_marker(shape)
+        if marker is not None:
+            if marker not in visual_markers:
+                visual_markers.append(marker)
             continue
 
         # Tables: flatten to bullets
         if shape.has_table:
             for row in shape.table.rows:
-                cells = [_clean(c.text_frame.text) for c in row.cells if _clean(c.text_frame.text)]
-                if cells:
+                # Keep empty cells as '' so column count matches the header row;
+                # filter only fully-empty rows.
+                cells = [_clean(c.text_frame.text) for c in row.cells]
+                if any(c.strip() for c in cells):
                     body_lines.append("- " + " | ".join(cells))
             continue
 
@@ -114,10 +155,11 @@ def _slide_to_md(slide_num: int, slide) -> str:
             notes_text = f"\n> *Notes: {raw}*"
 
     parts = [heading]
-    if body_lines:
-        parts.extend(body_lines)
-    elif has_image and not body_lines:
-        parts.append("[image]")
+    parts.extend(body_lines)
+    # Emit every distinct visual marker even when the slide also has text —
+    # the visual signal must not be silently dropped just because there's a
+    # textbox on the same slide.
+    parts.extend(visual_markers)
     if notes_text:
         parts.append(notes_text)
 
@@ -138,22 +180,35 @@ def pptx_to_markdown(pptx_path: Path, chapter: str | None = None) -> str:
     Returns:
         Markdown string, ready to write to a file.
     """
-    prs = Presentation(pptx_path)
+    try:
+        prs = Presentation(pptx_path)
+    except (zipfile.BadZipFile, KeyError) as exc:
+        # BadZipFile: not a zip / corrupt. KeyError: zip but not a pptx
+        # (missing [Content_Types].xml). Both are input errors scoped to the
+        # construction call; a KeyError from shape iteration below is a code
+        # bug and must surface, not be masked as a corrupt-file error.
+        raise ValueError(f"could not read {pptx_path.name} as a .pptx file: {exc}") from exc
 
     # Deck title: try the first slide's title, then fall back to filename
     deck_title = None
     if prs.slides:
         deck_title = _slide_title(prs.slides[0])
     if not deck_title:
-        deck_title = pptx_path.stem
+        deck_title = _clean(pptx_path.stem)
 
     chapter_label = f"Ch {chapter} — " if chapter else ""
-    # deck_title may be the filename stem (not run through _clean), and the source
-    # name is interpolated outside a code span, so defang both here.
-    header = f"# {chapter_label}{_defang(deck_title)}\n\n*Source: {_defang(pptx_path.name)}*"
+    # Both deck_title (from stem, already _clean'd above) and pptx_path.name
+    # (filename) are interpolated into emphasis/heading context, so _clean
+    # escapes pipes, emphasis chars, and defangs wikilinks — bare _defang
+    # alone leaves '*' and '_' live, breaking the source-italic span.
+    header = f"# {chapter_label}{deck_title}\n\n*Source: {_clean(pptx_path.name)}*"
 
     slide_sections = []
     for i, slide in enumerate(prs.slides, start=1):
         slide_sections.append(_slide_to_md(i, slide))
+
+    if not slide_sections:
+        print(f"warning: {pptx_path.name} has no slides", file=sys.stderr)
+        return header + "\n"
 
     return header + "\n\n---\n\n" + "\n\n".join(slide_sections)

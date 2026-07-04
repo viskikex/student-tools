@@ -39,13 +39,13 @@ SLIDES_DIR = Path(os.environ.get("SLIDES_DIR") or Path.home() / "textbook-slides
 # Patterns tried in order against the stem (case-insensitive).
 # Each yields the raw digit string; we zero-pad to 2 digits.
 _CHAPTER_PATTERNS = [
-    r"ch(?:p|ap(?:ter)?)?[\s_-]*(\d+)",  # chapter3, chap3, chp3, ch3, ch-3
-    r"pp[\s_-]*(\d+)",                  # PP2, pp 3
-    r"week[\s_-]*(\d+)",               # week3, week-3
-    r"wk[\s_-]*(\d+)",                 # wk3
-    r"mod(?:ule)?[\s_-]*(\d+)",        # module3, mod3
-    r"lec(?:ture)?[\s_-]*(\d+)",       # lecture3, lec3
-    r"unit[\s_-]*(\d+)",               # unit3
+    r"ch(?:p|ap(?:ter)?)?[\s_-]*(\d{1,2})(?!\d)",  # chapter3, chap3, chp3, ch3, ch-3
+    r"pp[\s_-]*(\d{1,2})(?!\d)",                  # PP2, pp 3
+    r"week[\s_-]*(\d{1,2})(?!\d)",               # week3, week-3
+    r"wk[\s_-]*(\d{1,2})(?!\d)",                 # wk3
+    r"mod(?:ule)?[\s_-]*(\d{1,2})(?!\d)",        # module3, mod3
+    r"lec(?:ture)?[\s_-]*(\d{1,2})(?!\d)",       # lecture3, lec3
+    r"unit[\s_-]*(\d{1,2})(?!\d)",               # unit3
     # Bare number at a word boundary, last resort. Capped at 1-2 digits so a
     # stray course number (1100) or year (2024) doesn't get read as a chapter;
     # 3+ digit runs are skipped. Ambiguous cases should use --chapter.
@@ -53,8 +53,16 @@ _CHAPTER_PATTERNS = [
 ]
 
 
+# A YYYY-MM-DD (or YYYY_MM_DD) run anywhere in the stem — e.g. a lecture
+# filename dated "lecture-2024-03-15" — must not leak a chapter guess from
+# its month/day components once the year itself is rejected. Masked out
+# before any _CHAPTER_PATTERNS run.
+_DATE_RUN = re.compile(r"\b(19|20)\d{2}[-_]\d{1,2}[-_]\d{1,2}\b")
+
+
 def detect_chapter(stem: str) -> str | None:
     """Try to extract a chapter number from a filename stem."""
+    stem = _DATE_RUN.sub(" ", stem)
     for pattern in _CHAPTER_PATTERNS:
         m = re.search(pattern, stem, re.IGNORECASE)
         if m:
@@ -64,7 +72,15 @@ def detect_chapter(stem: str) -> str | None:
 
 def resolve_chapter(explicit: str | None, input_path: Path) -> str | None:
     if explicit:
-        return explicit.zfill(2)
+        try:
+            n = int(explicit)
+        except ValueError:
+            print(f"error: --chapter must be an integer, got: {explicit!r}", file=sys.stderr)
+            sys.exit(2)
+        if not (1 <= n <= 99):
+            print(f"error: --chapter must be 1-99, got: {n}", file=sys.stderr)
+            sys.exit(2)
+        return f"{n:02d}"
     return detect_chapter(input_path.stem)
 
 
@@ -98,8 +114,14 @@ def main() -> None:
 
     if args.out:
         output_path = args.out.expanduser().resolve()
+        auto_name = f"ch{chapter}.md" if chapter else input_path.with_suffix(".md").name
+        if str(args.out).endswith(("/", os.sep)) or output_path.is_dir():
+            # Trailing slash, or an existing directory even without one
+            # (common muscle memory) — derive the filename inside it.
+            output_path = output_path / auto_name
+        elif output_path.suffix.lower() != ".md":
+            output_path = output_path.with_name(output_path.name + ".md")
     elif chapter:
-        SLIDES_DIR.mkdir(parents=True, exist_ok=True)
         output_path = SLIDES_DIR / f"ch{chapter}.md"
     else:
         # No chapter detected and no --out: drop alongside the input file
@@ -113,10 +135,20 @@ def main() -> None:
     print(f"converting: {input_path.name}")
     if chapter:
         print(f"chapter:    {chapter}")
-    md = pptx_to_markdown(input_path, chapter=chapter)
+    try:
+        md = pptx_to_markdown(input_path, chapter=chapter)
+    except ValueError as exc:
+        # pptx_to_markdown re-raises input errors as ValueError; renderer bugs
+        # (KeyError etc. from shape iteration) are NOT caught here.
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(md, encoding="utf-8")
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(md, encoding="utf-8")
+    except OSError as exc:
+        print(f"error: cannot write to {output_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
     print(f"written:    {output_path}")
 
 
