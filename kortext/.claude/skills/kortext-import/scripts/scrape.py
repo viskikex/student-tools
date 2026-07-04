@@ -111,6 +111,7 @@ def main(argv: list[str]) -> int:
 
         fetched = 0
         skipped = 0
+        truncated = 0
         for item in manifest.spine:
             ch_num = chapter_number(item.href)
             if args.only_chapter is not None and ch_num != args.only_chapter:
@@ -124,10 +125,24 @@ def main(argv: list[str]) -> int:
             label = f"chapter {ch_num}" if ch_num is not None else item.href
             print(f"  fetching {label}…")
             xhtml = client.get_chapter_xhtml(args.book_id, item.href)
+            # A CDN hiccup can return 200 with a truncated/partial body. Without
+            # this check the file is saved as-is, and on the NEXT run
+            # out_path.exists() short-circuits it as "already present" —
+            # the README's "just run it again" resume advice doesn't catch a
+            # truncated-but-present file. A well-formed XHTML chapter always
+            # closes with </html>; a truncated one won't.
+            if len(xhtml) < 200 or not xhtml.rstrip().lower().endswith(b"</html>"):
+                truncated += 1
+                print(f"    ✗ {label}: response looks truncated ({len(xhtml)} bytes, "
+                      f"no closing </html>) — NOT saved, will retry next run")
+                continue
             out_path.write_bytes(xhtml)
             fetched += 1
 
-        print(f"\ndone: fetched {fetched}, skipped {skipped}")
+        summary = f"\ndone: fetched {fetched}, skipped {skipped}"
+        if truncated:
+            summary += f", {truncated} truncated (not saved, re-run to retry)"
+        print(summary)
     return 0
 
 

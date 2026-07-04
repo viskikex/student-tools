@@ -16,6 +16,7 @@ content fetch (in case the initial open uses cached data).
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 
@@ -27,6 +28,26 @@ OUT_DIR = PROJECT_ROOT / "probe_out"
 BASE = "https://read.na1.kortext.com"
 BOOK_ID = "REPLACE_WITH_YOUR_BOOK_ID"
 
+# Matches "          hdr  Authorization: <value>" and "  AUTH_TOKEN: <value>"
+# (the two shapes on_request/localStorage/sessionStorage produce below) — a
+# key/header name followed by ": " and a value, at the start of the line
+# (after leading whitespace). REQ/RESP lines start with "[<stamp>]" so they
+# never match this and pass through unmasked.
+_KV_LINE = re.compile(r"^(\s*(?:hdr\s+[\w-]+|[\w.-]+):\s*)(.+)$")
+
+
+def _redact_for_stdout(line: str) -> str:
+    """Mask a header/token/storage value down to its last 4 chars. The full
+    value stays in the file log (gitignored); the stdout summary — terminal
+    scrollback, screen recordings, shared screens — doesn't get the live
+    token."""
+    m = _KV_LINE.match(line)
+    if not m:
+        return line
+    prefix, value = m.groups()
+    if len(value) <= 8:
+        return line  # too short to plausibly be a secret
+    return f"{prefix}...{value[-4:]} (masked — full value in network_log.txt)"
 
 def main() -> None:
     OUT_DIR.mkdir(exist_ok=True)
@@ -117,12 +138,16 @@ def main() -> None:
 
         log_path.write_text("\n".join(events), encoding="utf-8")
 
-        # Print a summary to stdout, full log saved to file.
+        # Print a summary to stdout, full log saved to file. The summary is
+        # masked: header values (Authorization, Cookie, etc.) and localStorage
+        # /sessionStorage values are live session tokens — printing them in
+        # full means terminal scrollback, screen recordings, or a shared
+        # screen also captures them, even though the file log is gitignored.
         print(f"\ntotal events: {len(events)}")
         print(f"full log → {log_path}")
-        print("\n--- last 40 events ---")
+        print("\n--- last 40 events (token/header values masked; see full log for real values) ---")
         for line in events[-40:]:
-            print(line)
+            print(_redact_for_stdout(line))
 
         browser.close()
 

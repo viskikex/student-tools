@@ -44,7 +44,10 @@ def main() -> None:
         resp = context.request.get("https://app.na1.kortext.com/account/token")
         print(f"GET /account/token  →  status={resp.status}  ct={resp.headers.get('content-type')}  len={len(resp.body())}")
         body = resp.text()
-        print(f"body[:500]:\n{body[:500]}")
+        # The raw body IS the JWT for this endpoint — printing it in full puts
+        # a live session token in terminal scrollback/recordings. Mask it.
+        shown_body = body if len(body) <= 20 else f"{body[:12]}...{body[-4:]} (masked, {len(body)} chars total)"
+        print(f"body (masked): {shown_body}")
         (OUT_DIR / "token_response.txt").write_text(body, encoding="utf-8")
 
         # If the body looks like a JWT (three dot-separated chunks of base64),
@@ -58,7 +61,8 @@ def main() -> None:
                     exp_dt = datetime.fromtimestamp(exp, tz=timezone.utc)
                     delta = exp_dt - datetime.now(tz=timezone.utc)
                     print(f"\nJWT decoded — exp in {delta} (UTC {exp_dt.isoformat()})")
-                print(f"payload: {json.dumps(payload, indent=2)[:600]}")
+                safe_payload = {k: v for k, v in payload.items() if k not in ("name", "email", "sub")}
+                print(f"payload (name/email/sub redacted): {json.dumps(safe_payload, indent=2)[:600]}")
 
                 # Try fetching chapter 2 with this token to confirm it works.
                 token = stripped

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import base64
 import json
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -95,6 +96,15 @@ class KortextClient:
                 f"No auth state at {self._auth_state_path}. "
                 f"Run `python .claude/skills/kortext-import/scripts/auth.py` first."
             )
+        # Defensively re-tighten permissions on every open: auth.py only sets
+        # mode 0o600 at WRITE time, so a file that pre-existed with broader
+        # perms (backup restore, copy between machines, created before this
+        # chmod line existed) is never re-tightened otherwise. This file holds
+        # a live session cookie -- full account access without the password.
+        try:
+            self._auth_state_path.chmod(0o600)
+        except OSError:
+            pass  # e.g. read-only filesystem; not worth failing the whole open over
         self._playwright = sync_playwright().start()
         self._browser = self._playwright.chromium.launch(headless=True)
         self._context = self._browser.new_context(storage_state=str(self._auth_state_path))
@@ -135,7 +145,7 @@ class KortextClient:
             self._token = token
             try:
                 payload = decode_jwt_payload(self._token)
-                self._token_exp = payload.get("exp")
+                self._token_exp = payload.get("exp") or (now + 3600)
             except Exception:
                 self._token_exp = now + 3600  # fall back to 1hr guess
         return self._token
@@ -170,6 +180,25 @@ class KortextClient:
         time.sleep(REQUEST_DELAY_S)
         return body
 
+    def _get_json(self, url: str) -> dict | list:
+        """Like _get, but for endpoints that must return JSON. A stale session
+        commonly returns 200 with an HTML login page rather than a clean 401
+        (the exact failure mode _ensure_token already guards against for the
+        token endpoint) — passing that straight to json.loads raises a cryptic
+        'Expecting value' with no hint that re-running auth.py is the fix.
+        Scoped to JSON callers only: get_manifest/get_chapter_xhtml legitimately
+        return XML/XHTML that starts with '<', so a shape check there would
+        misfire on real content."""
+        body = self._get(url)
+        stripped = body.lstrip()
+        if not stripped[:1] in (b"{", b"["):
+            raise RuntimeError(
+                f"{url} returned 200 but the body isn't JSON (likely an HTML "
+                f"login page) — saved auth state is expired, re-run auth.py / "
+                f"kortext-auth"
+            )
+        return json.loads(body.decode("utf-8"))
+
     # ---- high level ------------------------------------------------------
 
     def list_books(self) -> list[dict]:
@@ -180,11 +209,11 @@ class KortextClient:
         # we'll discover via /api/library/v1/books on demand. For now, return
         # whatever Kortext gives.
         url = f"{READ_BASE}/api/library/v1/books?pageNo=1&pageSize=100"
-        return json.loads(self._get(url).decode("utf-8"))
+        return self._get_json(url)
 
     def get_book_metadata(self, book_id: str) -> dict:
         url = f"{READ_BASE}/api/library/v1/books/{book_id}?enhanceBook=true"
-        return json.loads(self._get(url).decode("utf-8"))
+        return self._get_json(url)
 
     def get_manifest(self, book_id: str) -> BookManifest:
         """Fetch package.opf + toc.ncx, parse into a BookManifest."""
@@ -216,8 +245,16 @@ def _parse_manifest(book_id: str, opf_bytes: bytes, ncx_bytes: bytes) -> BookMan
     # Build id → manifest item map.
     items_by_id: dict[str, dict[str, str]] = {}
     for item in manifest.findall("opf:item", NS):
-        items_by_id[item.attrib["id"]] = {
-            "href": item.attrib["href"],
+        item_id = item.attrib.get("id")
+        href = item.attrib.get("href")
+        if item_id is None or href is None:
+            print(
+                f"warning: skipping malformed manifest item (missing id or href): {item.attrib}",
+                file=sys.stderr,
+            )
+            continue
+        items_by_id[item_id] = {
+            "href": href,
             "media_type": item.attrib.get("media-type", ""),
         }
 

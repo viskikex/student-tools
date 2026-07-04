@@ -241,19 +241,26 @@ def _heading_text(h: Tag) -> str:
       1. <h2><span class="HeadingNumber">2.1 </span>Title...</h2>  → "2.1 Title..."
       2. <h1><span class="PartNumber">Part I</span><span class="PartTitle">A Prov...</span></h1>
          → "Part I — A Prov..."  (em-dash separator; sibling spans have no whitespace)
+
+    A <br> inside a heading renders as a literal '\\n' via _inline_text (by
+    design, for body text where line breaks are meaningful) — but a heading
+    must stay on one line: '# Title\\nTitle Two' breaks the markdown heading
+    and _split_number's regex can't match a number prefix across the newline.
+    Collapse ALL whitespace (not just space/tab) to a single space here.
     """
     part_num = h.find("span", class_="PartNumber")
     part_title = h.find("span", class_="PartTitle")
     if part_num is not None and part_title is not None:
-        return f"{_inline_text(part_num).strip()} — {_inline_text(part_title).strip()}"
+        text = f"{_inline_text(part_num).strip()} — {_inline_text(part_title).strip()}"
+        return re.sub(r"\s+", " ", text).strip()
 
     num_el = h.find("span", class_="HeadingNumber")
     if num_el is None:
-        return _inline_text(h)
+        return re.sub(r"\s+", " ", _inline_text(h)).strip()
     number = _inline_text(num_el).strip()
     num_el.extract()
     rest = _inline_text(h).strip()
-    return f"{number} {rest}".strip()
+    return re.sub(r"\s+", " ", f"{number} {rest}".strip())
 
 
 def _render_keyword_group(div: Tag, out: list[str]) -> None:
@@ -271,23 +278,20 @@ def _render_formal_para(div: Tag, out: list[str], depth: int) -> None:
     with a bold heading."""
     heading = div.find("div", class_="Heading")
     heading_text = _inline_text(heading) if heading else ""
-    body_parts: list[str] = []
-    for child in div.children:
-        if isinstance(child, Tag) and child.find(class_="Heading") is child:
-            continue
-        if isinstance(child, Tag) and "Heading" in (child.get("class") or []):
-            continue
-        if isinstance(child, NavigableString):
-            t = str(child).strip()
-            if t:
-                body_parts.append(t)
-            continue
-        if isinstance(child, Tag):
-            sub: list[str] = []
-            _render_children(child, sub, depth + 1)
-            body_parts.append("\n".join(sub).strip())
+    if heading is not None:
+        heading.extract()  # remove so the body pass below doesn't re-render it
 
-    body_md = "\n".join(p for p in body_parts if p).strip()
+    # Render the (now heading-less) div through the normal dispatch table —
+    # this is the same _render_children a top-level section uses, so its
+    # existing ul/ol branch (bullet/numbered markers) fires correctly. The
+    # previous implementation called _render_children on each child
+    # individually, which meant a <ul> direct child had _render_children
+    # invoked with parent=<ul> — iterating <li> elements that have no
+    # dispatch case, silently dropping the '- '/'1. ' markers.
+    sub: list[str] = []
+    _render_children(div, sub, depth + 1)
+    body_md = "\n".join(sub).strip()
+
     if heading_text:
         out.append(f"\n> **{heading_text}**")
     else:

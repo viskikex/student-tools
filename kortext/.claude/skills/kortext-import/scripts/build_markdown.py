@@ -87,6 +87,7 @@ def main(argv: list[str]) -> int:
     index_entries: list[tuple[int, str, str]] = []  # (order, label, md_filename)
     order = 0
     last_chapter = 0  # track last seen chapter number so Parts sort right after it
+    seen_filenames: set[str] = set()  # collision guard (60-char slugify truncation, or prefix reuse)
 
     for spine in meta["spine"]:
         href = spine["href"]
@@ -125,7 +126,7 @@ def main(argv: list[str]) -> int:
             skip_title_suffix = True
         elif href.startswith("html/Part_"):
             # Extract the part number from "html/Part_1.xhtml" → "1" → "i"
-            part_digit = href.removeprefix("html/Part_").rstrip(".xhtml").rstrip("_")
+            part_digit = href.removeprefix("html/Part_").removesuffix(".xhtml")
             try:
                 roman = _to_roman(int(part_digit))
             except ValueError:
@@ -139,6 +140,17 @@ def main(argv: list[str]) -> int:
             md_filename = f"{prefix}.md"
         else:
             md_filename = f"{prefix}-{slugify(rendered.title_clean)}.md"
+        if md_filename in seen_filenames:
+            # Two chapter titles whose slugified form shares the first 60
+            # chars (or two spine items landing on the same prefix) would
+            # otherwise silently overwrite each other. Disambiguate instead.
+            stem = md_filename.removesuffix(".md")
+            n = 2
+            while f"{stem}-{n}.md" in seen_filenames:
+                n += 1
+            print(f"  warning: filename collision on {md_filename!r}, using {stem}-{n}.md instead")
+            md_filename = f"{stem}-{n}.md"
+        seen_filenames.add(md_filename)
         md_path = book_dir / md_filename
 
         # Frontmatter block.
