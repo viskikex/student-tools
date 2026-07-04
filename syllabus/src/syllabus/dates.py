@@ -37,11 +37,18 @@ _YEAR = re.compile(r"\b(20[2-3]\d)\b")
 
 
 def infer_year(text: str) -> int | None:
-    """Most common plausible year mentioned anywhere in the document."""
+    """Most common plausible year mentioned anywhere in the document.
+
+    Ties break toward the smaller year so the result is independent of the
+    order years appear in the text (a cross-year syllabus mentioning 2026 and
+    2027 equally must pick the same default regardless of which is named first).
+    """
     years = Counter(int(y) for y in _YEAR.findall(text))
-    if years:
-        return years.most_common(1)[0][0]
-    return None
+    if not years:
+        return None
+    top = years.most_common()
+    best_count = top[0][1]
+    return min(y for y, c in top if c == best_count)
 
 
 def defang(text: str) -> str:
@@ -58,14 +65,22 @@ def defang(text: str) -> str:
     return re.sub(r"\[(?=\[)", "[​", text)
 
 
-def _clean_context(line: str) -> str:
-    text = re.sub(r"\s+", " ", line).strip(" #|->*•\t").strip()
-    if len(text) > 110:
-        text = text[:107].rstrip() + "…"
-    # Contexts land in a markdown table: keep pipes from breaking it, and defang
-    # Obsidian wikilinks/embeds ([[note]] / ![[note]]) so a syllabus line can't
-    # pull in other vault notes.
-    return defang(text).replace("|", "\\|")
+def _normalize_context(line: str) -> str:
+    """Whitespace-normalize and strip table/list markers. Returns CLEAN TEXT —
+    no defang, no pipe-escape, no truncation. This is the dedupe key, the JSON
+    ``title`` value, and the _date_id hash input, so it must not carry render
+    artifacts (ZWSP from defang, markdown ``\\|`` escapes) that would break
+    consumer string-search/dedup. Defang + pipe-escape + truncation are applied
+    only at markdown-render time in render_table (ZWSP-in-title and truncated-context-id-collision issues)."""
+    return re.sub(r"\s+", " ", line).strip(" #|->*•\t").strip()
+
+
+def _truncate_for_display(context: str, limit: int = 110) -> str:
+    """Truncate a normalized context for table/JSON display. The full context is
+    retained for dedupe and id hashing; only the rendered form is shortened."""
+    if len(context) > limit:
+        return context[: limit - 3].rstrip() + "…"
+    return context
 
 
 def _safe_date(year: int, month: int, day: int) -> date | None:
@@ -76,30 +91,65 @@ def _safe_date(year: int, month: int, day: int) -> date | None:
 
 
 def extract_dates(text: str, default_year: int) -> list[tuple[date, str]]:
-    """Scan line by line; return (date, context-line) pairs, sorted, deduped."""
+    """Scan line by line; return (date, context-line) pairs, sorted, deduped.
+
+    A line may name a date range spanning the year boundary ('Dec 15 - Jan 10'):
+    when two or more dates share a line and a later one inherited the year (no
+    explicit year stated) but its month is earlier than a prior hit's month, the
+    later one rolls into the next year. Only inherited years are adjusted — an
+    explicit year is always honored as written.
+    """
     found: dict[tuple[date, str], None] = {}
     for line in text.splitlines():
-        hits: list[date] = []
+        hits: list[tuple[int, date, bool]] = []  # (start pos, date, year_was_explicit)
         for m in _NAMED.finditer(line):
             month = _MONTHS[m.group(1)[:3].lower()]
-            year = int(m.group(3)) if m.group(3) else default_year
+            explicit = m.group(3) is not None
+            year = int(m.group(3)) if explicit else default_year
             d = _safe_date(year, month, int(m.group(2)))
             if d:
-                hits.append(d)
+                hits.append((m.start(), d, explicit))
         for m in _NUMERIC.finditer(line):
-            month, day = int(m.group(1)), int(m.group(2))
-            if not (1 <= month <= 12 and 1 <= day <= 31):
+            a, b = int(m.group(1)), int(m.group(2))
+            # Unambiguous day-first (e.g. 31/12): first number can't be a month.
+            if a > 12 and 1 <= b <= 12:
+                month, day = b, a
+            elif 1 <= a <= 12 and 1 <= b <= 31:
+                month, day = a, b
+            else:
                 continue
-            year = default_year
-            if m.group(3):
+            explicit = m.group(3) is not None
+            if explicit:
                 raw = int(m.group(3))
-                year = raw + 2000 if raw < 100 else raw
+                # Standard 2-digit-year pivot (Y2K convention): 0-49 -> 20xx,
+                # 50-99 -> 19xx. Unconditional raw+2000 sent '4/5/99' to 2099 —
+                # 73 years into the future for a syllabus that's never dated
+                # more than a couple years out.
+                year = raw + (2000 if raw < 50 else 1900) if raw < 100 else raw
+            else:
+                year = default_year
             d = _safe_date(year, month, day)
             if d:
-                hits.append(d)
+                hits.append((m.start(), d, explicit))
         if hits:
-            context = _clean_context(line)
-            for d in hits:
+            # _NAMED and _NUMERIC run as separate passes; restore true textual
+            # order so the cross-boundary roll-over below compares adjacent dates.
+            hits.sort(key=lambda h: h[0])
+            context = _normalize_context(line)
+            # Roll inherited-year dates whose month precedes a prior hit's month
+            # into the next year (cross-boundary ranges like 'Dec 15 - Jan 10').
+            resolved: list[date] = []
+            for i, (_pos, d, explicit) in enumerate(hits):
+                if explicit or i == 0:
+                    resolved.append(d)
+                    continue
+                prior = resolved[-1]
+                if d.year == prior.year and d.month < prior.month:
+                    rolled = _safe_date(d.year + 1, d.month, d.day)
+                    resolved.append(rolled if rolled else d)
+                else:
+                    resolved.append(d)
+            for d in resolved:
                 found.setdefault((d, context))
     return sorted(found)
 
@@ -112,7 +162,8 @@ def render_table(entries: list[tuple[date, str]]) -> str:
         "|------|-----|------------------|",
     ]
     for d, context in entries:
-        lines.append(f"| {d:%Y-%m-%d} | {d:%a} | {context} |")
+        cell = _truncate_for_display(defang(context).replace("|", "\\|"))
+        lines.append(f"| {d:%Y-%m-%d} | {d:%a} | {cell} |")
     return "\n".join(lines)
 
 
@@ -149,8 +200,8 @@ def key_date_items(
     return [
         {
             "source": "syllabus",
-            "id": _date_id(d, context),
-            "title": context,
+            "id": _date_id(d, context),  # full context -> no id collision
+            "title": _truncate_for_display(context),  # display form only
             "course": None,          # syllabus has no reliable course identity (CLAUDE.md)
             "type": "key-date",
             "due_at": d.isoformat(),  # date-only; time unknown
@@ -172,6 +223,11 @@ def schedule_feed(
     """Wrap the items with staleness metadata, mirroring the canvas slice's
     envelope. ``timezone`` is null because the dates are tz-naive (date-only)."""
     now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        # A tz-naive now (the type hint allows it) would format with no 'Z'
+        # and no offset — a silently ambiguous timestamp in the feed. Assume
+        # UTC, matching the aware default above.
+        now = now.replace(tzinfo=timezone.utc)
     items = key_date_items(entries, source_file, today=today)
     return {
         "generated_at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),

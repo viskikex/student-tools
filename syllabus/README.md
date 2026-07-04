@@ -130,6 +130,17 @@ syllabus/
 │   ├── docx2md.py      # docx → markdown (headings, lists, tables)
 │   ├── pdf2md.py       # pdf → text + ligature repair
 │   └── dates.py        # date extraction for the key-dates table
+├── tests/              # unittest suite
 ├── convert-syllabus    # shell wrapper (Mac/Linux convenience)
 └── pyproject.toml
 ```
+
+---
+
+## Running the tests
+
+```bash
+.venv/bin/python -m unittest discover tests
+```
+
+That's the whole command, run from inside the `syllabus/` folder. I used the standard library's `unittest` instead of `pytest`, so there's nothing extra to install. If your fingers reach for `pytest` out of habit, it isn't a dependency here and won't find anything.

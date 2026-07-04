@@ -78,23 +78,34 @@ def main() -> None:
         sys.exit(1)
 
     suffix = input_path.suffix.lower()
-    if suffix == ".docx":
-        from syllabus.docx2md import docx_to_markdown
-        body = docx_to_markdown(input_path)
-    elif suffix == ".pdf":
-        from syllabus.pdf2md import pdf_to_markdown
-        body = pdf_to_markdown(input_path)
-    elif suffix == ".doc":
-        print(
-            "error: old-style .doc isn't supported. Open it in Word/Pages/Google Docs "
-            "and save as .docx, then re-run.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    else:
-        print(f"error: expected a .docx or .pdf file, got: {suffix or '(no extension)'}", file=sys.stderr)
+    try:
+        if suffix == ".docx":
+            from syllabus.docx2md import docx_to_markdown
+            body = docx_to_markdown(input_path)
+        elif suffix == ".pdf":
+            from syllabus.pdf2md import pdf_to_markdown
+            body = pdf_to_markdown(input_path)
+        elif suffix == ".doc":
+            print(
+                "error: old-style .doc isn't supported. Open it in Word/Pages/Google Docs "
+                "and save as .docx, then re-run.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        else:
+            print(f"error: expected a .docx or .pdf file, got: {suffix or '(no extension)'}", file=sys.stderr)
+            sys.exit(1)
+    except ValueError as exc:
+        # docx_to_markdown/pdf_to_markdown re-raise input errors (corrupt file,
+        # wrong format, encrypted) as ValueError, scoped to their own parse
+        # calls — a KeyError/etc. from the rendering pass itself is NOT caught
+        # here and surfaces as a real bug, not a misleading "corrupt file".
+        print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    if args.year is not None and not (2000 <= args.year <= 2100):
+        print(f"error: --year must be 2000-2100, got: {args.year}", file=sys.stderr)
+        sys.exit(2)
     year = args.year or infer_year(body) or date.today().year
     entries = extract_dates(body, default_year=year)
 
@@ -105,7 +116,7 @@ def main() -> None:
         output_path = SYLLABUS_DIR / f"{slugify(input_path.stem)}.md"
 
     md = "\n".join([
-        f"# {defang(input_path.stem)}",
+        f"# {defang(input_path.stem).replace('|', '\\|')}",
         "",
         f"> Converted from `{input_path.name}` on {date.today():%Y-%m-%d}. "
         f"The key dates below are auto-extracted (assumed year: {year}) — "
