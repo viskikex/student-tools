@@ -80,6 +80,12 @@ These tools only ever touch **your own** stuff, using **your own** logins — th
 - **canvas-grabber** logs into Canvas as you and downloads your own data. Canvas normally offers an official "access token" for this; some schools switch that off for students, and this tool is the workaround for those schools. Going around a disabled feature *may* bump up against your school's acceptable-use policy — that's yours to check. It also downloads things like class rosters (your classmates' names), so treat the output folder as private. See [`canvas-grabber/README.md`](canvas-grabber/README.md#security--privacy).
 - **kortext** only works with eBooks you already have legitimate access to through your own account, and is for **personal study use only**. See [`kortext/README.md`](kortext/README.md#legal--terms-of-service) for the full disclaimer.
 
+## How this was built
+
+These tools were written with heavy help from [Claude Code](https://claude.com/claude-code). I am still learning, and I could not have built the trickier parts, like the Canvas login flow or the XHTML-to-Markdown pipeline, on my own yet. The ideas, the scope decisions, the prompting, and the review were mine. I used these tools myself while taking classes, so the features exist because I actually needed them, not because they sounded impressive.
+
+I am not claiming to be a professional developer here. I am claiming to be curious enough to turn a repetitive school problem into working code, careful enough to add guardrails around untrusted data, and honest enough to tell you where the help came from.
+
 ## License
 
 [MIT](LICENSE) — short and permissive: do what you like, just keep the copyright notice. This root license covers the whole repo; `canvas-grabber/` also ships its own identical copy.
